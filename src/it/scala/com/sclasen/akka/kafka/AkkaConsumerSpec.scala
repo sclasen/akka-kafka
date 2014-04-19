@@ -28,11 +28,19 @@ class AkkaConsumerSpec(_system: ActorSystem) extends TestKit(_system) with Impli
       val consumer = new AkkaConsumer(testProps(system, topic, receiver))
       import system.dispatcher
       consumer.start().map{
-        _ => testActor ! ConnectorFSM.Start
+        _ => testActor ! ConnectorFSM.Started
       }
-      expectMsg(2 seconds, ConnectorFSM.Start)
-      sendMessages()
-      receiveN(messages, 5 seconds)
+      expectMsg(2 seconds, ConnectorFSM.Started)
+
+      (1 to 10).foreach {
+       cycle =>
+        sendMessages()
+        receiveN(messages, 5 seconds)
+        consumer.commit().map {
+          _ => testActor ! ConnectorFSM.Committed
+        }
+        expectMsg(10 seconds, ConnectorFSM.Committed)
+      }
     }
   }
 
@@ -74,7 +82,7 @@ object AkkaConsumerSpec {
     2,
     new DefaultDecoder(),
     new DefaultDecoder(),
-    receiver, commitInterval = 1 second, commitAfterMsgCount = 66
+    receiver, commitAfterMsgCount = 1000
   )
 
 }

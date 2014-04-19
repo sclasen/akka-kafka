@@ -3,5 +3,5 @@
 target
 .env
 project/target
-kafka
+kafka-install
 *.log

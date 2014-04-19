@@ -26,6 +26,10 @@ object ConnectorFSM {
 
   case object Commit extends ConnectorProtocol
 
+  case object Started extends ConnectorProtocol
+
+  case object Committed extends ConnectorProtocol
+
 }
 
 object StreamFSM {
@@ -41,6 +45,8 @@ object StreamFSM {
   case object Empty extends StreamState
 
   case object Unused extends StreamState
+
+  case object FlattenContinue extends StreamState
 
   sealed trait StreamProtocol
 
@@ -71,6 +77,7 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
   startWith(Stopped, 0)
 
   var commitTimeoutCancellable: Option[Cancellable] = None
+  var committer: Option[ActorRef] = None
 
   def scheduleCommit = {
     commitTimeoutCancellable = Some(context.system.scheduler.scheduleOnce(commitInterval, self, Commit))
@@ -93,21 +100,23 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
           val streamActor = context.actorOf(Props(new StreamFSM(stream, maxInFlightPerStream, receiver)), s"stream${index}")
           listener ! streamActor
       }
+      log.info("connectorFSM created streamFSMs")
       context.children.foreach(_ ! Continue)
       scheduleCommit
-      sender ! Start
+      sender ! Started
       goto(Receiving) using 0
   }
 
   when(Receiving) {
     case Event(Received, uncommitted) if uncommitted == commitAfterMsgCount =>
-      log.info("commit threshold exceeded, committing {} messages", uncommitted)
+      log.info("{}:{}, commit threshold exceeded, committing {} messages", Receiving, Received, uncommitted)
       goto(Committing) using 0
     case Event(Received, uncommitted) =>
-      log.debug("received uncommitted {}", uncommitted + 1)
+      log.debug("{}:{}, uncommitted {}", Receiving, Received, uncommitted + 1)
       stay using (uncommitted + 1)
     case Event(Commit, uncommitted) =>
-      log.info("commit timeout elapsed, committing {} messages", uncommitted)
+      log.info("{}:{}, timeout elapsed or explicit commit, committing {} messages", Receiving, Received, uncommitted)
+      committer = Some(sender)
       goto(Committing) using 0
   }
 
@@ -120,23 +129,25 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
   onTransition {
     case Committing -> Receiving =>
       scheduleCommit
+      committer.foreach(_ ! Committed)
+      committer = None
       context.children.foreach(_ ! StartProcessing)
   }
 
   when(Committing, stateTimeout = 1 seconds) {
     case Event(Received, drained) =>
-      log.info("committed receive, drained: {}", drained)
+      log.info("{}:{}, committed receive, drained: {}", Committing, Received, drained)
       stay()
     case Event(StateTimeout, drained) =>
-      log.warning(s"waiting to commit, have ${drained} of ${streams} drained")
+      log.warning("{}:{}, waiting to commit, have {} of {} drained", Committing, StateTimeout, drained, streams)
       context.children.foreach(ref => log.info("{} terminated {}", ref.path, ref.isTerminated))
       context.children.foreach(_ ! Drain)
       stay using (0)
     case Event(Drained(stream), drained) if drained + 1 < context.children.size =>
-      log.debug("{} drained: {}", stream, drained + 1)
+      log.debug("{}:{}, {} drained: {}", Committing, Drained, stream, drained + 1)
       stay using (drained + 1)
     case Event(Drained(stream), drained) if drained + 1 == context.children.size =>
-      log.debug("{} drained,  finished: {}", stream, drained + 1)
+      log.debug("{}:{}, {} drained,  finished: {}", Committing, Drained, stream, drained + 1)
       log.info("completed draining,  committing")
       connector.commitOffsets
       log.info("committed")
@@ -177,66 +188,88 @@ class StreamFSM[Key, Msg](stream: KafkaStream[Key, Msg], maxOutstanding: Int, re
     case Event(Continue, outstanding) if hasNext() =>
       val msg = msgIterator.next().message()
       conn ! Received
-      log.debug("{} received", me)
+      log.debug("{}:{}, {} received", me, Processing, Continue)
       receiver ! msg
       self ! Continue
       stay using (outstanding + 1)
     /* no message in iterator and no outstanding. this stream is prob not going to get messages */
     case Event(Continue, outstanding) if outstanding == 0 =>
-      log.info("{} empty", me)
+      log.debug("{}:{}, {} empty", Processing, Continue, me)
       goto(Unused)
     /* no msg in iterator, but have outstanding */
     case Event(Continue, outstanding) =>
-      log.info("{} outstanding", me)
-      stay()
+      log.debug("{}:{}, {} goto FlattenContinue", Processing, Continue, me)
+      goto(FlattenContinue)
     /* message processed */
     case Event(Processed, outstanding) =>
-      log.debug("{} processed {} out", me, outstanding - 1)
+      log.debug("{}:{}, {} processed {} out", Processing, Processed, me, outstanding - 1)
       self ! Continue
       stay using (outstanding - 1)
     /* conn says drain, we have no outstanding */
     case Event(Drain, outstanding) if outstanding == 0 =>
-      log.info("{} drain empty", me)
+      log.debug("{}:{}, {} drain empty", Processing, Drain, me)
       goto(Empty)
     /* conn says drain, we have outstanding */
     case Event(Drain, outstanding) =>
-      log.info("{} drain {}", me, outstanding)
+      log.debug("{}:{}, {} drain {}", Processing, Drain, me, outstanding)
+      goto(Draining)
+  }
+
+  /*
+  We go into FlattenContinue when we poll the iterator and there are no msgs but we have in-flight messages.
+  We anticipate that future calls to the iterator will timeout as well, so instead of polling once for every Continue
+  that is in the mailbox, we just drain them out, and wait for the in-flight messages to drain.
+  once we do that, we go back to processing. This speeds up commit alot in the cycle where a stream goes empty.
+  */
+  when(FlattenContinue){
+    case Event(Continue, outstanding) =>
+      stay()
+    case Event(Processed, outstanding) if outstanding == 1 =>
+      self ! Continue
+      goto(Processing) using (outstanding - 1)
+    case Event(Processed, outstanding) =>
+      stay using (outstanding - 1)
+    case Event(Drain, outstanding) if outstanding == 0 =>
+      log.debug("{}:{}, {} drain empty", FlattenContinue, Drain, me)
+      goto(Empty)
+    case Event(Drain, outstanding) =>
+      log.debug("{}:{}, {} drain {}", FlattenContinue, Drain, me, outstanding)
       goto(Draining)
   }
 
   when(Full) {
     case Event(Continue, outstanding) =>
-      log.debug("{} full, {} out", me, outstanding)
+      log.debug("{}:{}, {} full, {} out", Full, Continue, me, outstanding)
       stay()
     case Event(Processed, outstanding) =>
-      log.debug("{} full processed, {} out", me, outstanding - 1)
+      log.debug("{}:{}, {} full processed, {} out", Full, Processed, me, outstanding - 1)
       goto(Processing) using (outstanding - 1)
     case Event(Drain, outstanding) =>
-      log.info("{} full, drain {}", me, outstanding)
+      log.debug("{}:{}, {} full, drain {}", Full, Drain, me, outstanding)
       goto(Draining)
   }
 
   when(Draining) {
     /* drained last message */
     case Event(Processed, outstanding) if outstanding == 1 =>
-      log.info("{} drained", me)
+      log.debug("{}:{}, {} drained", Draining, Processed, me)
       goto(Empty) using 0
     /* still draining  */
     case Event(Processed, outstanding) =>
-      log.debug("draining: outstanding {}", outstanding - 1)
+      log.debug("{},{}, {} : outstanding {}",  Draining, Processed, me, outstanding - 1)
       stay using (outstanding - 1)
     case Event(Continue, _) =>
-      log.debug("{} received a scheduled Continue from Processing which arrived after Drain, ignoring", me)
+      log.debug("{}:{}, {} received a Continue which arrived after Drain, ignoring", Draining, Continue, me)
       stay()
   }
 
   when(Empty) {
     /* conn says go */
     case Event(StartProcessing, _) =>
-      log.debug("{} resume", me)
+      log.debug("{}:{}, {} resume", Empty, StartProcessing, me)
       goto(Processing) using 0
     case Event(Continue, _) =>
-      log.debug("{} received a scheduled Continue from Processing which arrived after Drain, ignoring", me)
+      log.debug("{}:{}, {} received a Continue which arrived after Drain, ignoring", Empty, Continue, me)
       stay()
     case Event(Drain, _) =>
       conn ! Drained(me)
@@ -246,10 +279,11 @@ class StreamFSM[Key, Msg](stream: KafkaStream[Key, Msg], maxOutstanding: Int, re
   /* we think this stream wont get messages */
   when(Unused) {
     case Event(Drain, _) =>
-      log.debug("{} unused drain empty", me)
+      log.debug("{}:{}, {} unused drain empty", Unused, Drain, me)
       goto(Empty)
     case Event(Continue, _) =>
-      log.warning("{} unexpected Continue in Unused from {}", me, sender)
+      /*todo figure this one out, doesnt seem to hurt anything though*/
+      log.debug("{}:{}, {} unexpected Continue in Unused from {}", Unused, Continue, me, sender)
       stay()
   }
 
@@ -270,6 +304,7 @@ class StreamFSM[Key, Msg](stream: KafkaStream[Key, Msg], maxOutstanding: Int, re
 
   onTransition {
     case _ -> Empty =>
+      log.info("{} Drained", me)
       conn ! Drained(me)
   }
 

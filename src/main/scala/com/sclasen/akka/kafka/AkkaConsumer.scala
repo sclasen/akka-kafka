@@ -26,6 +26,8 @@ class AkkaConsumer[Key,Msg](props:AkkaConsumerProps[Key,Msg]) {
 
   import AkkaConsumer._
 
+  lazy val connector = createConnection(props)
+
   def kafkaConsumerProps(zkConnect:String, groupId:String) = toProps(
     "zookeeper.connect" -> zkConnect,
     "zookeeper.connection.timeout.ms" -> "10000",
@@ -33,7 +35,7 @@ class AkkaConsumer[Key,Msg](props:AkkaConsumerProps[Key,Msg]) {
     "auto.commit.enable" -> "false",
     "zookeeper.session.timeout.ms" -> "1000",
     "zookeeper.sync.time.ms" -> "1000",
-    "consumer.timeout.ms" -> "500"
+    "consumer.timeout.ms" -> "200"
   )
 
   def kafkaConsumer(zkConnect:String, groupId:String) = {
@@ -48,8 +50,7 @@ class AkkaConsumer[Key,Msg](props:AkkaConsumerProps[Key,Msg]) {
     system.actorOf(Props(new ConnectorFSM(props, consumerConnector)), "connectorFSM")
   }
 
-  def start():Future[Unit]= {
-    val connector = createConnection(props)
+  def start():Future[Unit] = {
     import props.system.dispatcher
     (connector ? ConnectorFSM.Start)(props.startTimeout).map{
       started =>
@@ -57,8 +58,16 @@ class AkkaConsumer[Key,Msg](props:AkkaConsumerProps[Key,Msg]) {
     }
   }
 
+  def commit():Future[Unit] = {
+    import props.system.dispatcher
+    (connector ? ConnectorFSM.Commit)(props.startTimeout).map{
+      started =>
+        props.system.log.info("consumer committed")
+    }
+  }
 }
 
 
 case class AkkaConsumerProps[Key,Msg](system:ActorSystem, zkConnect:String, topic:String, group:String, streams:Int, keyDecoder:Decoder[Key], msgDecoder:Decoder[Msg],receiver: ActorRef,
-                                      maxInFlightPerStream:Int = 64, commitInterval:FiniteDuration = 10 seconds, commitAfterMsgCount:Int = 10000, startTimeout:Timeout = Timeout(5 seconds))
+                                      maxInFlightPerStream:Int = 64, commitInterval:FiniteDuration = 10 seconds, commitAfterMsgCount:Int = 10000,
+                                      startTimeout:Timeout = Timeout(5 seconds), commitTimeout:Timeout = Timeout(5 seconds))
