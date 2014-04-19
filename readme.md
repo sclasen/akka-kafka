@@ -64,7 +64,7 @@ case class AkkaConsumerProps[Key,Msg](system:ActorSystem,
 
 So a full example of getting a consumer up and running looks like this.
 
-```
+```scala
 import akka.actor.{Props, ActorSystem, Actor}
 import com.sclasen.akka.kafka.{AkkaConsumer, AkkaConsumerProps, StreamFSM}
 import kafka.serializer.DefaultDecoder

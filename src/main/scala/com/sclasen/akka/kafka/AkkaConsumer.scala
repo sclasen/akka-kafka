@@ -63,8 +63,17 @@ class AkkaConsumer[Key,Msg](props:AkkaConsumerProps[Key,Msg]) {
   }
 }
 
-case class AkkaConsumerProps[Key,Msg](system:ActorSystem, zkConnect:String, topic:String, group:String, streams:Int,
-                                      keyDecoder:Decoder[Key], msgDecoder:Decoder[Msg],
-                                      receiver: ActorRef, maxInFlightPerStream:Int = 64,
-                                      commitInterval:FiniteDuration = 10 seconds, commitAfterMsgCount:Int = 10000,
-                                      startTimeout:Timeout = Timeout(5 seconds), commitTimeout:Timeout = Timeout(5 seconds))
+case class AkkaConsumerProps[Key,Msg](system:ActorSystem,
+                                      zkConnect:String,
+                                      topic:String,
+                                      group:String,
+                                      streams:Int,
+                                      keyDecoder:Decoder[Key],
+                                      msgDecoder:Decoder[Msg],
+                                      receiver: ActorRef,
+                                      maxInFlightPerStream:Int = 64,
+                                      commitInterval:FiniteDuration = 10 seconds,
+                                      commitAfterMsgCount:Int = 10000,
+                                      startTimeout:Timeout = Timeout(5 seconds),
+                                      commitTimeout:Timeout = Timeout(5 seconds)
+                                       )
