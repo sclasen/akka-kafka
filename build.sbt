@@ -2,7 +2,7 @@ organization := "com.sclasen"
 
 name := "akka-kafka"
 
-version := "0.1"
+version := "0.0.1"
 
 scalaVersion := "2.10.4"
 
@@ -15,7 +15,7 @@ resolvers += "spray repo" at "http://repo.spray.io"
 
 libraryDependencies += "com.typesafe.akka" %% "akka-actor" % "2.3.2" % "compile"
 
-libraryDependencies += "com.typesafe.akka" %% "akka-slf4j" % "2.3.2" % "compile"
+libraryDependencies += "com.typesafe.akka" %% "akka-slf4j" % "2.3.2" % "test,it"
 
 libraryDependencies +=   "org.apache.kafka" %% "kafka"  %"0.8.1" exclude("log4j", "log4j") exclude("org.slf4j","slf4j-log4j12")
 
@@ -25,7 +25,7 @@ libraryDependencies += "org.scalatest" %% "scalatest" % "2.0" % "test,it"
 
 libraryDependencies += "commons-io" % "commons-io" % "2.4" % "test,it"
 
-libraryDependencies += "org.slf4j" % "log4j-over-slf4j" % "1.6.6"
+libraryDependencies += "org.slf4j" % "log4j-over-slf4j" % "1.6.6" % "provided"
 
 parallelExecution in Test := false
 
