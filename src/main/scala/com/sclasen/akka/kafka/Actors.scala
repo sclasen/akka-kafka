@@ -1,10 +1,8 @@
 package com.sclasen.akka.kafka
 
 import kafka.consumer._
-import concurrent._
 import concurrent.duration._
 import akka.actor._
-import scala.util.{Failure, Success}
 import ConnectorFSM._
 import StreamFSM._
 
@@ -65,7 +63,7 @@ It will commit every `maxSecondsTillCommit` seconds or `maxUncommittedMsgs` proc
 Spins up `streams` StreamFSMs which manage the kafka KafkaStream and  ConsumerIterator for the stream.
 
 */
-class ConnectorFSM[Key,Msg](props: AkkaConsumerProps[Key,Msg], connector: ConsumerConnector) extends Actor with FSM[ConnectorState, Int] {
+class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: ConsumerConnector) extends Actor with FSM[ConnectorState, Int] {
 
   import props._
   import context.dispatcher
@@ -89,29 +87,15 @@ class ConnectorFSM[Key,Msg](props: AkkaConsumerProps[Key,Msg], connector: Consum
       }))
       context.system.eventStream.subscribe(listener, classOf[DeadLetter])
 
-      log.info("connector creating stream fsms")
-      Future {
-        connector.createMessageStreams(Map(topic -> streams)).apply(topic).zipWithIndex.foreach {
-          case (stream, index) =>
-            Future {
-              val streamActor = context.actorOf(Props(new StreamFSM(stream, maxInFlightPerStream, receiver)), s"stream${index}")
-              listener ! streamActor
-            }.onComplete {
-              case Success(_) => log.info(s"created stream${index}")
-              case Failure(e) => log.error(e, s"failed stream${index}")
-            }
-        }
-        log.info("connector started stream fsms")
-      }.onComplete {
-        case Success(_) =>
-          log.info(s"created streams")
-          context.children.foreach(_ ! Continue)
-          scheduleCommit
-        case Failure(e) =>
-          log.error(e, s"failed streams")
-          self ! PoisonPill
+      log.info("connectorFSM creating streamFSMs")
+      connector.createMessageStreams(Map(topic -> streams)).apply(topic).zipWithIndex.foreach {
+        case (stream, index) =>
+          val streamActor = context.actorOf(Props(new StreamFSM(stream, maxInFlightPerStream, receiver)), s"stream${index}")
+          listener ! streamActor
       }
-
+      context.children.foreach(_ ! Continue)
+      scheduleCommit
+      sender ! Start
       goto(Receiving) using 0
   }
 
@@ -120,7 +104,7 @@ class ConnectorFSM[Key,Msg](props: AkkaConsumerProps[Key,Msg], connector: Consum
       log.info("commit threshold exceeded, committing {} messages", uncommitted)
       goto(Committing) using 0
     case Event(Received, uncommitted) =>
-      log.debug("received uncommitted {}", uncommitted)
+      log.debug("received uncommitted {}", uncommitted + 1)
       stay using (uncommitted + 1)
     case Event(Commit, uncommitted) =>
       log.info("commit timeout elapsed, committing {} messages", uncommitted)
@@ -171,7 +155,7 @@ class ConnectorFSM[Key,Msg](props: AkkaConsumerProps[Key,Msg], connector: Consum
   }
 }
 
-class StreamFSM[Key,Msg](stream: KafkaStream[Key,Msg], maxOutstanding: Int, receiver: ActorRef) extends Actor with FSM[StreamState, Int] {
+class StreamFSM[Key, Msg](stream: KafkaStream[Key, Msg], maxOutstanding: Int, receiver: ActorRef) extends Actor with FSM[StreamState, Int] {
 
   lazy val msgIterator = stream.iterator()
   val conn = context.parent
@@ -191,7 +175,7 @@ class StreamFSM[Key,Msg](stream: KafkaStream[Key,Msg], maxOutstanding: Int, rece
       goto(Full)
     /* ok to process, and msg available */
     case Event(Continue, outstanding) if hasNext() =>
-       val msg = msgIterator.next().message()
+      val msg = msgIterator.next().message()
       conn ! Received
       log.debug("{} received", me)
       receiver ! msg

@@ -1,10 +1,13 @@
 package com.sclasen.akka.kafka
 
 import akka.actor.{Props, ActorRef, ActorSystem}
+import akka.pattern._
 import scala.concurrent.duration._
 import kafka.consumer.{ConsumerConfig, Consumer}
 import java.util.Properties
 import kafka.serializer.Decoder
+import scala.concurrent.Future
+import akka.util.Timeout
 
 object AkkaConsumer{
 
@@ -45,12 +48,17 @@ class AkkaConsumer[Key,Msg](props:AkkaConsumerProps[Key,Msg]) {
     system.actorOf(Props(new ConnectorFSM(props, consumerConnector)), "connectorFSM")
   }
 
-  def start(){
+  def start():Future[Unit]= {
     val connector = createConnection(props)
-    connector ! ConnectorFSM.Start
+    import props.system.dispatcher
+    (connector ? ConnectorFSM.Start)(props.startTimeout).map{
+      started =>
+        props.system.log.info("consumer started")
+    }
   }
 
 }
 
 
-case class AkkaConsumerProps[Key,Msg](system:ActorSystem, zkConnect:String, topic:String, group:String, streams:Int, keyDecoder:Decoder[Key], msgDecoder:Decoder[Msg],receiver: ActorRef, maxInFlightPerStream:Int = 64, commitInterval:FiniteDuration = 10 seconds, commitAfterMsgCount:Int = 10000)
+case class AkkaConsumerProps[Key,Msg](system:ActorSystem, zkConnect:String, topic:String, group:String, streams:Int, keyDecoder:Decoder[Key], msgDecoder:Decoder[Msg],receiver: ActorRef,
+                                      maxInFlightPerStream:Int = 64, commitInterval:FiniteDuration = 10 seconds, commitAfterMsgCount:Int = 10000, startTimeout:Timeout = Timeout(5 seconds))
