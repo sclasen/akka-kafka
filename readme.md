@@ -1,9 +1,9 @@
 akka-kafka
 ==========
 
-Actor based connector built on top of the high level kafka consumer.
+Actor based kafka consumer built on top of the high level kafka consumer.
 
-Manages backpressure so the consumer doesnt overwhelm other parts of the system.
+Manages backpressure so the consumer doesn't overwhelm other parts of the system.
 
 Commits offsets at a configurable interval, and also after a configurable number of messages are processed, or also programatically.
 
