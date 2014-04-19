@@ -60,15 +60,6 @@ object StreamFSM {
 
 }
 
-
-/*
-ConnectorFSM manages commits on the kafka ConsumerConnector.
-
-It will commit every `maxSecondsTillCommit` seconds or `maxUncommittedMsgs` processed messages.
-
-Spins up `streams` StreamFSMs which manage the kafka KafkaStream and  ConsumerIterator for the stream.
-
-*/
 class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: ConsumerConnector) extends Actor with FSM[ConnectorState, Int] {
 
   import props._

@@ -75,14 +75,14 @@ object AkkaConsumerSpec {
   )
 
   def testProps(system:ActorSystem, topic:String, receiver:ActorRef) = AkkaConsumerProps(
-    system,
-    "localhost:2181",
-    topic,
-    "consumer-spec",
-    2,
-    new DefaultDecoder(),
-    new DefaultDecoder(),
-    receiver, commitAfterMsgCount = 1000
+    system = system,
+    zkConnect = "localhost:2181",
+    topic = topic,
+    group = "consumer-spec",
+    streams = 2,
+    keyDecoder = new DefaultDecoder(),
+    msgDecoder = new DefaultDecoder(),
+    receiver = receiver
   )
 
 }

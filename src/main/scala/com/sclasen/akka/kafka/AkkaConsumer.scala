@@ -10,7 +10,6 @@ import scala.concurrent.Future
 import akka.util.Timeout
 
 object AkkaConsumer{
-
   def toProps(props:(String, String)*): Properties = {
     props.foldLeft(new Properties()) {
       case (p, (k, v)) =>
@@ -19,8 +18,6 @@ object AkkaConsumer{
     }
   }
 }
-
-
 
 class AkkaConsumer[Key,Msg](props:AkkaConsumerProps[Key,Msg]) {
 
@@ -41,7 +38,6 @@ class AkkaConsumer[Key,Msg](props:AkkaConsumerProps[Key,Msg]) {
   def kafkaConsumer(zkConnect:String, groupId:String) = {
     Consumer.create(new ConsumerConfig(kafkaConsumerProps(zkConnect, groupId)))
   }
-
 
   def createConnection(props:AkkaConsumerProps[Key,Msg]) =  {
     import props._
@@ -67,7 +63,8 @@ class AkkaConsumer[Key,Msg](props:AkkaConsumerProps[Key,Msg]) {
   }
 }
 
-
-case class AkkaConsumerProps[Key,Msg](system:ActorSystem, zkConnect:String, topic:String, group:String, streams:Int, keyDecoder:Decoder[Key], msgDecoder:Decoder[Msg],receiver: ActorRef,
-                                      maxInFlightPerStream:Int = 64, commitInterval:FiniteDuration = 10 seconds, commitAfterMsgCount:Int = 10000,
+case class AkkaConsumerProps[Key,Msg](system:ActorSystem, zkConnect:String, topic:String, group:String, streams:Int,
+                                      keyDecoder:Decoder[Key], msgDecoder:Decoder[Msg],
+                                      receiver: ActorRef, maxInFlightPerStream:Int = 64,
+                                      commitInterval:FiniteDuration = 10 seconds, commitAfterMsgCount:Int = 10000,
                                       startTimeout:Timeout = Timeout(5 seconds), commitTimeout:Timeout = Timeout(5 seconds))
