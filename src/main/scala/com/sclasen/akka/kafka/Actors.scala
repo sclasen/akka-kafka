@@ -5,7 +5,6 @@ import concurrent._
 import concurrent.duration._
 import akka.actor._
 import scala.util.{Failure, Success}
-import AkkaConsumer._
 import ConnectorFSM._
 import StreamFSM._
 
@@ -66,7 +65,7 @@ It will commit every `maxSecondsTillCommit` seconds or `maxUncommittedMsgs` proc
 Spins up `streams` StreamFSMs which manage the kafka KafkaStream and  ConsumerIterator for the stream.
 
 */
-class ConnectorFSM(props: AkkaConsumerProps, connector: ConsumerConnector) extends Actor with FSM[ConnectorState, Int] {
+class ConnectorFSM[Key,Msg](props: AkkaConsumerProps[Key,Msg], connector: ConsumerConnector) extends Actor with FSM[ConnectorState, Int] {
 
   import props._
   import context.dispatcher
@@ -165,9 +164,14 @@ class ConnectorFSM(props: AkkaConsumerProps, connector: ConsumerConnector) exten
   def handler(from: ConnectorState, to: ConnectorState) {
     log.info("connector transition {} -> {}", from, to)
   }
+
+  override def postStop(): Unit = {
+    connector.shutdown()
+    super.postStop()
+  }
 }
 
-class StreamFSM(stream: MsgStream, maxOutstanding: Int, receiver: ActorRef) extends Actor with FSM[StreamState, Int] {
+class StreamFSM[Key,Msg](stream: KafkaStream[Key,Msg], maxOutstanding: Int, receiver: ActorRef) extends Actor with FSM[StreamState, Int] {
 
   lazy val msgIterator = stream.iterator()
   val conn = context.parent
@@ -187,7 +191,7 @@ class StreamFSM(stream: MsgStream, maxOutstanding: Int, receiver: ActorRef) exte
       goto(Full)
     /* ok to process, and msg available */
     case Event(Continue, outstanding) if hasNext() =>
-      val msg = msgIterator.next().message()
+       val msg = msgIterator.next().message()
       conn ! Received
       log.debug("{} received", me)
       receiver ! msg
