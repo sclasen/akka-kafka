@@ -50,15 +50,15 @@ class AkkaConsumer[Key,Msg](props:AkkaConsumerProps[Key,Msg]) {
     import props.system.dispatcher
     (connector ? ConnectorFSM.Start)(props.startTimeout).map{
       started =>
-        props.system.log.info("consumer started")
+        props.system.log.info("at=consumer-started")
     }
   }
 
   def commit():Future[Unit] = {
     import props.system.dispatcher
     (connector ? ConnectorFSM.Commit)(props.commitTimeout).map{
-      started =>
-        props.system.log.info("consumer committed")
+      committed =>
+        props.system.log.info("at=consumer-committed")
     }
   }
 }

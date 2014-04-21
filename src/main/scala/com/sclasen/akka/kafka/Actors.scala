@@ -85,13 +85,13 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
       }))
       context.system.eventStream.subscribe(listener, classOf[DeadLetter])
 
-      log.info("connectorFSM creating streamFSMs")
+      log.info("at=start")
       connector.createMessageStreams(Map(topic -> streams)).apply(topic).zipWithIndex.foreach {
         case (stream, index) =>
           val streamActor = context.actorOf(Props(new StreamFSM(stream, maxInFlightPerStream, receiver)), s"stream${index}")
           listener ! streamActor
       }
-      log.info("connectorFSM created streamFSMs")
+      log.info("at=created-streams")
       context.children.foreach(_ ! Continue)
       scheduleCommit
       sender ! Started
@@ -100,25 +100,33 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
 
   when(Receiving) {
     case Event(Received, uncommitted) if uncommitted == commitAfterMsgCount =>
-      log.info("{}:{}, commit threshold exceeded, committing {} messages", Receiving, Received, uncommitted)
+      debugRec(Received, uncommitted)
       goto(Committing) using 0
     case Event(Received, uncommitted) =>
-      log.debug("{}:{}, uncommitted {}", Receiving, Received, uncommitted + 1)
+      debugRec(Received, uncommitted + 1)
       stay using (uncommitted + 1)
     case Event(Commit, uncommitted) =>
-      log.info("{}:{}, timeout elapsed or explicit commit, committing {} messages", Receiving, Received, uncommitted)
+      debugRec(Commit, uncommitted)
       committer = Some(sender)
       goto(Committing) using 0
+    case Event(Committed, uncommitted) =>
+      debugRec(Committed, uncommitted)
+      stay()
+    case Event(d@Drained(s), uncommitted) =>
+      debugRec(d, uncommitted) /*when we had to send more than 1 Drain msg to streams, we get these*/
+      stay()
   }
 
   onTransition {
     case Receiving -> Committing =>
+      log.info("at=transition from={} to={} uncommitted={}", Receiving, Committing, stateData)
       commitTimeoutCancellable.foreach(_.cancel())
       context.children.foreach(_ ! Drain)
   }
 
   onTransition {
     case Committing -> Receiving =>
+      log.info("at=transition from={} to={}", Committing, Receiving)
       scheduleCommit
       committer.foreach(_ ! Committed)
       committer = None
@@ -127,34 +135,32 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
 
   when(Committing, stateTimeout = 1 seconds) {
     case Event(Received, drained) =>
-      log.info("{}:{}, committed receive, drained: {}", Committing, Received, drained)
+      log.info("state={} msg={} drained={} streams={}", Committing, Received, drained, streams)
       stay()
     case Event(StateTimeout, drained) =>
-      log.warning("{}:{}, waiting to commit, have {} of {} drained", Committing, StateTimeout, drained, streams)
-      context.children.foreach(ref => log.info("{} terminated {}", ref.path, ref.isTerminated))
+      log.warning("state={} msg={} drained={} streams={}", Committing, StateTimeout, drained, streams)
       context.children.foreach(_ ! Drain)
       stay using (0)
-    case Event(Drained(stream), drained) if drained + 1 < context.children.size =>
-      log.debug("{}:{}, {} drained: {}", Committing, Drained, stream, drained + 1)
+    case Event(d@Drained(stream), drained) if drained + 1 < context.children.size =>
+      debugCommit(d, stream, drained + 1)
       stay using (drained + 1)
-    case Event(Drained(stream), drained) if drained + 1 == context.children.size =>
-      log.debug("{}:{}, {} drained,  finished: {}", Committing, Drained, stream, drained + 1)
-      log.info("completed draining,  committing")
+    case Event(d@Drained(stream), drained) if drained + 1 == context.children.size =>
+      debugCommit(d, stream, drained + 1)
+      log.info("at=drain-finised")
       connector.commitOffsets
-      log.info("committed")
+      log.info("at=committed-offsets")
       goto(Receiving) using 0
-  }
-
-  onTransition(handler _)
-
-  def handler(from: ConnectorState, to: ConnectorState) {
-    log.info("connector transition {} -> {}", from, to)
   }
 
   override def postStop(): Unit = {
     connector.shutdown()
     super.postStop()
   }
+
+  def debugRec(msg:AnyRef, uncommitted:Int) = log.debug("state={} msg={} uncommitted={}", Receiving, msg,  uncommitted)
+
+  def debugCommit(msg:AnyRef, stream:String, drained:Int) = log.debug("state={} msg={} drained={}", Committing, msg,  drained)
+
 }
 
 class StreamFSM[Key, Msg](stream: KafkaStream[Key, Msg], maxOutstanding: Int, receiver: ActorRef) extends Actor with FSM[StreamState, Int] {
@@ -173,36 +179,36 @@ class StreamFSM[Key, Msg](stream: KafkaStream[Key, Msg], maxOutstanding: Int, re
   when(Processing) {
     /* too many outstanding, wait */
     case Event(Continue, outstanding) if outstanding == maxOutstanding =>
-      log.debug("{} full", me)
-      goto(Full)
+       debug(Processing, Continue, outstanding)
+       goto(Full)
     /* ok to process, and msg available */
     case Event(Continue, outstanding) if hasNext() =>
       val msg = msgIterator.next().message()
       conn ! Received
-      log.debug("{}:{}, {} received", me, Processing, Continue)
+      debug(Processing, Continue, outstanding +1)
       receiver ! msg
       self ! Continue
       stay using (outstanding + 1)
     /* no message in iterator and no outstanding. this stream is prob not going to get messages */
     case Event(Continue, outstanding) if outstanding == 0 =>
-      log.debug("{}:{}, {} empty", Processing, Continue, me)
+      debug(Processing, Continue, outstanding)
       goto(Unused)
     /* no msg in iterator, but have outstanding */
     case Event(Continue, outstanding) =>
-      log.debug("{}:{}, {} goto FlattenContinue", Processing, Continue, me)
+      debug(Processing, Continue, outstanding)
       goto(FlattenContinue)
     /* message processed */
     case Event(Processed, outstanding) =>
-      log.debug("{}:{}, {} processed {} out", Processing, Processed, me, outstanding - 1)
+      debug(Processing, Processed, outstanding -1)
       self ! Continue
       stay using (outstanding - 1)
     /* conn says drain, we have no outstanding */
     case Event(Drain, outstanding) if outstanding == 0 =>
-      log.debug("{}:{}, {} drain empty", Processing, Drain, me)
+      debug(Processing, Drain, outstanding)
       goto(Empty)
     /* conn says drain, we have outstanding */
     case Event(Drain, outstanding) =>
-      log.debug("{}:{}, {} drain {}", Processing, Drain, me, outstanding)
+      debug(Processing, Drain, outstanding)
       goto(Draining)
   }
 
@@ -214,53 +220,59 @@ class StreamFSM[Key, Msg](stream: KafkaStream[Key, Msg], maxOutstanding: Int, re
   */
   when(FlattenContinue){
     case Event(Continue, outstanding) =>
+      debug(FlattenContinue, Continue, outstanding)
       stay()
     case Event(Processed, outstanding) if outstanding == 1 =>
+      debug(FlattenContinue, Processed, outstanding -1)
       self ! Continue
       goto(Processing) using (outstanding - 1)
     case Event(Processed, outstanding) =>
+      debug(FlattenContinue, Processed, outstanding -1)
       stay using (outstanding - 1)
     case Event(Drain, outstanding) if outstanding == 0 =>
-      log.debug("{}:{}, {} drain empty", FlattenContinue, Drain, me)
+      debug(FlattenContinue, Drain, outstanding)
       goto(Empty)
     case Event(Drain, outstanding) =>
-      log.debug("{}:{}, {} drain {}", FlattenContinue, Drain, me, outstanding)
+      debug(FlattenContinue, Drain, outstanding)
       goto(Draining)
   }
 
   when(Full) {
     case Event(Continue, outstanding) =>
-      log.debug("{}:{}, {} full, {} out", Full, Continue, me, outstanding)
+      debug(Full, Continue, outstanding)
       stay()
     case Event(Processed, outstanding) =>
-      log.debug("{}:{}, {} full processed, {} out", Full, Processed, me, outstanding - 1)
+      debug(Full, Processed, outstanding - 1)
       goto(Processing) using (outstanding - 1)
     case Event(Drain, outstanding) =>
-      log.debug("{}:{}, {} full, drain {}", Full, Drain, me, outstanding)
+      debug(Full, Drain, outstanding)
       goto(Draining)
   }
 
   when(Draining) {
     /* drained last message */
     case Event(Processed, outstanding) if outstanding == 1 =>
-      log.debug("{}:{}, {} drained", Draining, Processed, me)
+      debug(Draining, Processed, outstanding)
       goto(Empty) using 0
     /* still draining  */
     case Event(Processed, outstanding) =>
-      log.debug("{},{}, {} : outstanding {}",  Draining, Processed, me, outstanding - 1)
+      debug(Draining, Processed, outstanding)
       stay using (outstanding - 1)
-    case Event(Continue, _) =>
-      log.debug("{}:{}, {} received a Continue which arrived after Drain, ignoring", Draining, Continue, me)
+    case Event(Continue, outstanding) =>
+      debug(Draining, Continue, outstanding)
+      stay()
+    case Event(Drain, outstanding) =>
+      debug(Draining, Drain, outstanding)
       stay()
   }
 
   when(Empty) {
     /* conn says go */
-    case Event(StartProcessing, _) =>
-      log.debug("{}:{}, {} resume", Empty, StartProcessing, me)
+    case Event(StartProcessing, outstanding) =>
+      debug(Unused, Drain, outstanding)
       goto(Processing) using 0
-    case Event(Continue, _) =>
-      log.debug("{}:{}, {} received a Continue which arrived after Drain, ignoring", Empty, Continue, me)
+    case Event(Continue, outstanding) =>
+      debug(Unused, Drain, outstanding)
       stay()
     case Event(Drain, _) =>
       conn ! Drained(me)
@@ -269,13 +281,12 @@ class StreamFSM[Key, Msg](stream: KafkaStream[Key, Msg], maxOutstanding: Int, re
 
   /* we think this stream wont get messages */
   when(Unused) {
-    case Event(Drain, _) =>
-      log.debug("{}:{}, {} unused drain empty", Unused, Drain, me)
+    case Event(Drain, outstanding) =>
+      debug(Unused, Drain, outstanding)
       goto(Empty)
-    case Event(Continue, _) =>
-      /*todo figure this one out, doesnt seem to hurt anything though*/
-      log.debug("{}:{}, {} unexpected Continue in Unused from {}", Unused, Continue, me, sender)
-      stay()
+    case Event(Continue, outstanding) =>
+      debug(Unused, Continue, outstanding)
+      goto(Processing)
   }
 
   onTransition {
@@ -295,13 +306,8 @@ class StreamFSM[Key, Msg](stream: KafkaStream[Key, Msg], maxOutstanding: Int, re
 
   onTransition {
     case _ -> Empty =>
-      log.info("{} Drained", me)
+      log.info("stream={} at=Drained", me)
       conn ! Drained(me)
-  }
-
-  onTransition {
-    case _ -> Draining =>
-      log.debug("{} goto draining: outstanding {}", me, nextStateData)
   }
 
   onTransition(handler _)
@@ -312,8 +318,12 @@ class StreamFSM[Key, Msg](stream: KafkaStream[Key, Msg], maxOutstanding: Int, re
   }
 
   def handler(from: StreamState, to: StreamState) {
-    log.debug("{} transition {} -> {}", me, from, to)
+    log.debug("stream={} at=transition from={} to={}", me, from, to)
   }
+
+  def debug(state:StreamState, msg:StreamProtocol, outstanding:Int) = log.debug("stream={} state={} msg={} outstanding={}", me, state, msg,  outstanding)
+
+
 
   lazy val me = self.path.name
 }

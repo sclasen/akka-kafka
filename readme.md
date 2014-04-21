@@ -7,6 +7,8 @@ Manages backpressure so the consumer doesn't overwhelm other parts of the system
 
 Commits offsets at a configurable interval, and also after a configurable number of messages are processed, or also programatically.
 
+The consumer allows asynchronous/concurrent processing of a configurable bounded number of in-flight messages.
+
 use
 ===
 
@@ -80,6 +82,12 @@ object Example {
 
   val system = ActorSystem("test")
   val printer = system.actorOf(Props[Printer])
+
+
+  /*
+  the consumer will have 4 streams and max 64 messages per stream in flight, for a total of 256
+  concurrently processed messages.
+  */
   val consumerProps = AkkaConsumerProps(
     system = system,
     zkConnect = "localhost:2181",
@@ -88,7 +96,8 @@ object Example {
     streams = 4, //one per partition
     keyDecoder = new DefaultDecoder(),
     msgDecoder = new DefaultDecoder(),
-    receiver = printer
+    receiver = printer,
+    maxInFlightPerStream = 64
   )
 
   val consumer = new AkkaConsumer(consumerProps)
