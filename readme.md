@@ -28,7 +28,7 @@ libraryDependencies += "org.slf4j" % "log4j-over-slf4j" % "1.6.6" % "compile"
 ```
 
 To use this library you must provide it with an actorRef that will receive messages from kafka, and will reply to the sender
-with `StreamFSM.Processed`.  If you do not reply in this way to every single message received, the connector will not be able
+with `StreamFSM.Processed` after a message has been successfully processed.  If you do not reply in this way to every single message received, the connector will not be able
 to drain all in-flight messages at commit time, and will hang.
 
 Here is an example of such an actor that just prints the messages.
