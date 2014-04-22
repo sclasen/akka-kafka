@@ -306,7 +306,7 @@ class StreamFSM[Key, Msg](stream: KafkaStream[Key, Msg], maxOutstanding: Int, re
 
   onTransition {
     case _ -> Empty =>
-      log.info("stream={} at=Drained", me)
+      log.debug("stream={} at=Drained", me)
       conn ! Drained(me)
   }
 
