@@ -135,7 +135,7 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
 
   when(Committing, stateTimeout = 1 seconds) {
     case Event(Received, drained) =>
-      log.info("state={} msg={} drained={} streams={}", Committing, Received, drained, streams)
+      debugCommit(Received, "stream", drained)
       stay()
     case Event(StateTimeout, drained) =>
       log.warning("state={} msg={} drained={} streams={}", Committing, StateTimeout, drained, streams)
