@@ -109,6 +109,27 @@ object Example {
 }
 ```
 
+configure
+=========
+
+The `reference.conf` file is used to provide defaults for the properties used to configure the underlying kafka consumer.
+
+To override any of these properties, use the standard akka `application.conf` mechanism.
+
+Note that the property values must be strings, as that is how kafka expects them.
+
+Do NOT set the `consumer.timeout.ms` to `-1`. This will break everything.
+
+```
+kafka.consumer {
+    zookeeper.connection.timeout.ms = "10000"
+    auto.commit.enable = "false"
+    zookeeper.session.timeout.ms = "1000"
+    zookeeper.sync.time.ms =  "1000"
+    consumer.timeout.ms =  "400"
+}
+```
+
 
 
 develop

@@ -2,15 +2,16 @@ package com.sclasen.akka.kafka
 
 import akka.actor.{Props, ActorRef, ActorSystem}
 import akka.pattern._
-import scala.concurrent.duration._
-import kafka.consumer.{ConsumerConfig, Consumer}
-import java.util.Properties
-import kafka.serializer.Decoder
-import scala.concurrent.Future
 import akka.util.Timeout
+import collection.JavaConverters._
+import concurrent.Future
+import concurrent.duration._
+import java.util.Properties
+import kafka.consumer.{ConsumerConfig, Consumer}
+import kafka.serializer.Decoder
 
 object AkkaConsumer{
-  def toProps(props:(String, String)*): Properties = {
+  def toProps(props:collection.mutable.Set[(String,String)]): Properties = {
     props.foldLeft(new Properties()) {
       case (p, (k, v)) =>
         p.setProperty(k, v)
@@ -25,15 +26,13 @@ class AkkaConsumer[Key,Msg](props:AkkaConsumerProps[Key,Msg]) {
 
   lazy val connector = createConnection(props)
 
-  def kafkaConsumerProps(zkConnect:String, groupId:String) = toProps(
-    "zookeeper.connect" -> zkConnect,
-    "zookeeper.connection.timeout.ms" -> "10000",
-    "group.id" -> groupId,
-    "auto.commit.enable" -> "false",
-    "zookeeper.session.timeout.ms" -> "1000",
-    "zookeeper.sync.time.ms" -> "1000",
-    "consumer.timeout.ms" -> "200"
-  )
+  def kafkaConsumerProps(zkConnect:String, groupId:String) = {
+    val consumerConfig = props.system.settings.config.getConfig("kafka.consumer")
+    val consumerProps = consumerConfig.entrySet().asScala.map{
+      entry => entry.getKey -> consumerConfig.getString(entry.getKey)
+    } ++ Set("zookeeper.connect" -> zkConnect, "group.id" -> groupId)
+    toProps(consumerProps)
+  }
 
   def kafkaConsumer(zkConnect:String, groupId:String) = {
     Consumer.create(new ConsumerConfig(kafkaConsumerProps(zkConnect, groupId)))

@@ -1,14 +1,16 @@
 package com.sclasen.akka.kafka
 
-import org.scalatest._
-import kafka.producer.{ProducerConfig, Producer}
 import akka.actor.{Props, Actor, ActorRef, ActorSystem}
-import kafka.serializer.DefaultDecoder
-import kafka.producer.KeyedMessage
 import akka.testkit.{TestKit, ImplicitSender}
-import scala.concurrent.duration._
+import concurrent.duration._
+import kafka.producer.{KeyedMessage,ProducerConfig, Producer}
+import kafka.serializer.DefaultDecoder
+
+import StreamFSM._
 import AkkaConsumerSpec._
-import com.sclasen.akka.kafka.StreamFSM.Processed
+
+import org.scalatest._
+
 
 
 class AkkaConsumerSpec(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
@@ -31,6 +33,13 @@ class AkkaConsumerSpec(_system: ActorSystem) extends TestKit(_system) with Impli
         _ => testActor ! ConnectorFSM.Started
       }
       expectMsg(2 seconds, ConnectorFSM.Started)
+
+      producer.send(new KeyedMessage(topic, 0.toString.getBytes, 0.toString.getBytes))
+      receiveOne(2 seconds)
+      consumer.commit().map {
+        _ => testActor ! ConnectorFSM.Committed
+      }
+      expectMsg(10 seconds, ConnectorFSM.Committed)
 
       (1 to 10).foreach {
        cycle =>
@@ -68,10 +77,10 @@ object AkkaConsumerSpec {
     new MsgProducer(new ProducerConfig(kafkaProducerProps))
   }
 
-  def kafkaProducerProps = AkkaConsumer.toProps(
+  def kafkaProducerProps = AkkaConsumer.toProps(collection.mutable.Set(
     "metadata.broker.list" -> "localhost:9092",
     "producer.type" -> "sync",
-    "request.required.acks" -> "-1"
+    "request.required.acks" -> "-1")
   )
 
   def testProps(system:ActorSystem, topic:String, receiver:ActorRef) = AkkaConsumerProps(

@@ -1,8 +1,9 @@
 package com.sclasen.akka.kafka
 
-import kafka.consumer._
-import concurrent.duration._
 import akka.actor._
+import concurrent.duration._
+import kafka.consumer._
+
 import ConnectorFSM._
 import StreamFSM._
 
@@ -322,8 +323,6 @@ class StreamFSM[Key, Msg](stream: KafkaStream[Key, Msg], maxOutstanding: Int, re
   }
 
   def debug(state:StreamState, msg:StreamProtocol, outstanding:Int) = log.debug("stream={} state={} msg={} outstanding={}", me, state, msg,  outstanding)
-
-
 
   lazy val me = self.path.name
 }
