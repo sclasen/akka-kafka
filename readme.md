@@ -20,7 +20,7 @@ If you dont want to use slf4j, you can substitute log4j.
 ```scala
 /* build.sbt */
 
-libraryDependencies += "com.sclasen" %% "akka-kafka" % "0.0.2" % "compile"
+libraryDependencies += "com.sclasen" %% "akka-kafka" % "0.0.3" % "compile"
 
 libraryDependencies += "com.typesafe.akka" %% "akka-slf4j" % "2.3.2" % "compile"
 
