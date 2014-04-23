@@ -4,10 +4,10 @@ akka-kafka
 Actor based kafka consumer built on top of the high level kafka consumer.
 
 Manages backpressure so the consumer doesn't overwhelm other parts of the system.
-
-Commits offsets at a configurable interval, and also after a configurable number of messages are processed, or also programatically.
-
 The consumer allows asynchronous/concurrent processing of a configurable bounded number of in-flight messages.
+
+Commits offsets at a configurable interval, and also after a configurable number of messages are processed, or also programatically. It waits till all in flight messages
+are processed at commit time, so you know that everything that's committed has been processed.
 
 use
 ===
@@ -118,7 +118,7 @@ To override any of these properties, use the standard akka `application.conf` me
 
 Note that the property values must be strings, as that is how kafka expects them.
 
-Do NOT set the `consumer.timeout.ms` to `-1`. This will break everything.
+Do NOT set the `consumer.timeout.ms` to `-1`. This will break everything. Don't set `auto.commit.enable` either.
 
 ```
 kafka.consumer {
