@@ -87,7 +87,7 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
       context.system.eventStream.subscribe(listener, classOf[DeadLetter])
 
       log.info("at=start")
-      connector.createMessageStreams(Map(topic -> streams)).apply(topic).zipWithIndex.foreach {
+      connector.createMessageStreams(Map(topic -> streams), props.keyDecoder, props.msgDecoder).apply(topic).zipWithIndex.foreach {
         case (stream, index) =>
           val streamActor = context.actorOf(Props(new StreamFSM(stream, maxInFlightPerStream, receiver)), s"stream${index}")
           listener ! streamActor
