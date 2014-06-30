@@ -49,6 +49,8 @@ The consumer is configured with an instance of `AkkaConsumerProps`, which looks 
 
 ```scala
 case class AkkaConsumerProps[Key,Msg](system:ActorSystem,
+                                      actorRefFactory:ActorRefFactory,
+                                      connectorActorName:Option[String],
                                       zkConnect:String,
                                       topic:String,
                                       group:String,
@@ -57,12 +59,20 @@ case class AkkaConsumerProps[Key,Msg](system:ActorSystem,
                                       msgDecoder:Decoder[Msg],
                                       receiver: ActorRef,
                                       maxInFlightPerStream:Int = 64,
-                                      commitInterval:FiniteDuration = 10 seconds,
-                                      commitAfterMsgCount:Int = 10000,
                                       startTimeout:Timeout = Timeout(5 seconds),
-                                      commitTimeout:Timeout = Timeout(5 seconds)
-                                       )
+                                      commitConfig:CommitConfig = CommitConfig())
+
+case class CommitConfig(commitInterval:Option[FiniteDuration] = Some(10 seconds),
+                        commitAfterMsgCount:Option[Int] = Some(10000),
+                        commitTimeout:Timeout = Timeout(5 seconds)
+                         )
 ```
+
+there are 2 helper methods on the `AkkaConsumerProps object` that ease the construction of  `AkkaConsumerProps`.
+
+Use `AkkaConsumerProps.forSystem(system = ...)` when you only need a single connector in your application. The connector will be created as a top level actor.
+
+Use `AkkaConsumerPrope.forContext(context = ...)` when you want to have multiple connectors in your application, or you want the connector to be a child of one of your actors.
 
 So a full example of getting a consumer up and running looks like this.
 
@@ -88,7 +98,7 @@ object Example {
   the consumer will have 4 streams and max 64 messages per stream in flight, for a total of 256
   concurrently processed messages.
   */
-  val consumerProps = AkkaConsumerProps(
+  val consumerProps = AkkaConsumerProps.forSystem(
     system = system,
     zkConnect = "localhost:2181",
     topic = "your-kafka-topic",
@@ -96,8 +106,7 @@ object Example {
     streams = 4, //one per partition
     keyDecoder = new DefaultDecoder(),
     msgDecoder = new DefaultDecoder(),
-    receiver = printer,
-    maxInFlightPerStream = 64
+    receiver = printer
   )
 
   val consumer = new AkkaConsumer(consumerProps)

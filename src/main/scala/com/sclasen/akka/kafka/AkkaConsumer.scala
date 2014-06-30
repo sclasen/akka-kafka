@@ -1,6 +1,6 @@
 package com.sclasen.akka.kafka
 
-import akka.actor.{Props, ActorRef, ActorSystem}
+import akka.actor._
 import akka.pattern._
 import akka.util.Timeout
 import collection.JavaConverters._
@@ -42,7 +42,9 @@ class AkkaConsumer[Key,Msg](props:AkkaConsumerProps[Key,Msg]) {
     import props._
     val consumerConfig = new ConsumerConfig(kafkaConsumerProps(zkConnect, group))
     val consumerConnector = Consumer.create(consumerConfig)
-    system.actorOf(Props(new ConnectorFSM(props, consumerConnector)), "connectorFSM")
+    props.connectorActorName.map{
+      name =>  system.actorOf(Props(new ConnectorFSM(props, consumerConnector)), name)
+    }.getOrElse(system.actorOf(Props(new ConnectorFSM(props, consumerConnector))))
   }
 
   def start():Future[Unit] = {
@@ -55,14 +57,45 @@ class AkkaConsumer[Key,Msg](props:AkkaConsumerProps[Key,Msg]) {
 
   def commit():Future[Unit] = {
     import props.system.dispatcher
-    (connector ? ConnectorFSM.Commit)(props.commitTimeout).map{
+    (connector ? ConnectorFSM.Commit)(props.commitConfig.commitTimeout).map{
       committed =>
         props.system.log.info("at=consumer-committed")
     }
   }
 }
 
+object AkkaConsumerProps {
+  def forSystem[Key, Msg](system: ActorSystem,
+                      zkConnect: String,
+                      topic: String,
+                      group: String,
+                      streams: Int,
+                      keyDecoder: Decoder[Key],
+                      msgDecoder: Decoder[Msg],
+                      receiver: ActorRef,
+                      connectorActorName:Option[String] = None,
+                      maxInFlightPerStream: Int = 64,
+                      startTimeout: Timeout = Timeout(5 seconds),
+                      commitConfig: CommitConfig = CommitConfig()): AkkaConsumerProps[Key, Msg] =
+    AkkaConsumerProps(system, system, zkConnect, topic, group, streams, keyDecoder, msgDecoder, receiver, connectorActorName, maxInFlightPerStream, startTimeout, commitConfig)
+
+  def forContext[Key, Msg](context: ActorContext,
+                      zkConnect: String,
+                      topic: String,
+                      group: String,
+                      streams: Int,
+                      keyDecoder: Decoder[Key],
+                      msgDecoder: Decoder[Msg],
+                      receiver: ActorRef,
+                      connectorActorName:Option[String] = None,
+                      maxInFlightPerStream: Int = 64,
+                      startTimeout: Timeout = Timeout(5 seconds),
+                      commitConfig: CommitConfig): AkkaConsumerProps[Key, Msg] =
+    AkkaConsumerProps(context.system, context, zkConnect, topic, group, streams, keyDecoder, msgDecoder, receiver,connectorActorName, maxInFlightPerStream, startTimeout, commitConfig)
+}
+
 case class AkkaConsumerProps[Key,Msg](system:ActorSystem,
+                                      actorRefFactory:ActorRefFactory,
                                       zkConnect:String,
                                       topic:String,
                                       group:String,
@@ -70,9 +103,12 @@ case class AkkaConsumerProps[Key,Msg](system:ActorSystem,
                                       keyDecoder:Decoder[Key],
                                       msgDecoder:Decoder[Msg],
                                       receiver: ActorRef,
+                                      connectorActorName:Option[String],
                                       maxInFlightPerStream:Int = 64,
-                                      commitInterval:FiniteDuration = 10 seconds,
-                                      commitAfterMsgCount:Int = 10000,
                                       startTimeout:Timeout = Timeout(5 seconds),
-                                      commitTimeout:Timeout = Timeout(5 seconds)
-                                       )
+                                      commitConfig:CommitConfig = CommitConfig())
+
+case class CommitConfig(commitInterval:Option[FiniteDuration] = Some(10 seconds),
+                        commitAfterMsgCount:Option[Int] = Some(10000),
+                        commitTimeout:Timeout = Timeout(5 seconds)
+                         )

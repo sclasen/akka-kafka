@@ -72,7 +72,7 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
   var committer: Option[ActorRef] = None
 
   def scheduleCommit = {
-    commitTimeoutCancellable = Some(context.system.scheduler.scheduleOnce(commitInterval, self, Commit))
+    commitTimeoutCancellable = commitConfig.commitInterval.map(i => context.system.scheduler.scheduleOnce(i, self, Commit))
   }
 
   when(Stopped) {
@@ -100,7 +100,7 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
   }
 
   when(Receiving) {
-    case Event(Received, uncommitted) if uncommitted == commitAfterMsgCount =>
+    case Event(Received, uncommitted) if commitConfig.commitAfterMsgCount.exists(_ == uncommitted) =>
       debugRec(Received, uncommitted)
       goto(Committing) using 0
     case Event(Received, uncommitted) =>

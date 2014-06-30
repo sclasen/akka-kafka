@@ -10,7 +10,7 @@ import StreamFSM._
 import AkkaConsumerSpec._
 
 import org.scalatest._
-
+import akka.util.Timeout
 
 
 class AkkaConsumerSpec(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
@@ -83,8 +83,9 @@ object AkkaConsumerSpec {
     "request.required.acks" -> "-1")
   )
 
-  def testProps(system:ActorSystem, topic:String, receiver:ActorRef) = AkkaConsumerProps(
+  def testProps(system:ActorSystem, topic:String, receiver:ActorRef) = AkkaConsumerProps.forSystem(
     system = system,
+    connectorActorName = Some("testFSM"),
     zkConnect = "localhost:2181",
     topic = topic,
     group = "consumer-spec",
