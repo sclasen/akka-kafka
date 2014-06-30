@@ -64,15 +64,14 @@ case class AkkaConsumerProps[Key,Msg](system:ActorSystem,
 
 case class CommitConfig(commitInterval:Option[FiniteDuration] = Some(10 seconds),
                         commitAfterMsgCount:Option[Int] = Some(10000),
-                        commitTimeout:Timeout = Timeout(5 seconds)
-                         )
+                        commitTimeout:Timeout = Timeout(5 seconds))
 ```
 
 there are 2 helper methods on the `AkkaConsumerProps object` that ease the construction of  `AkkaConsumerProps`.
 
 Use `AkkaConsumerProps.forSystem(system = ...)` when you only need a single connector in your application. The connector will be created as a top level actor.
 
-Use `AkkaConsumerPrope.forContext(context = ...)` when you want to have multiple connectors in your application, or you want the connector to be a child of one of your actors.
+Use `AkkaConsumerProps.forContext(context = ...)` when you want to have multiple connectors in your application, or you want the connector to be a child of one of your actors.
 
 So a full example of getting a consumer up and running looks like this.
 
