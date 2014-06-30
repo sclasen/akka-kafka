@@ -6,7 +6,7 @@ Actor based kafka consumer built on top of the high level kafka consumer.
 Manages backpressure so the consumer doesn't overwhelm other parts of the system.
 The consumer allows asynchronous/concurrent processing of a configurable, bounded number of in-flight messages.
 
-Commits offsets at a configurable interval, after a configurable number of messages are processed, and also programatically.
+You can configure the connector to commit offsets at a configurable interval, after a configured number of messages are processed, or simply commit the offsets programatically.
 It waits until all in flight messages are processed at commit time, so you know that everything that's committed has been processed.
 
 use
