@@ -10,7 +10,7 @@ import StreamFSM._
 import AkkaConsumerSpec._
 
 import org.scalatest._
-import kafka.consumer.{Whitelist, TopicFilter}
+import kafka.consumer.{Blacklist, Whitelist, TopicFilter}
 import akka.pattern._
 
 
@@ -21,7 +21,7 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
 
   val singleTopic = s"test${System.currentTimeMillis()}"
 
-  val topicFilter = s"test${System.currentTimeMillis()}"
+  val topicFilter = s"filterTest${System.currentTimeMillis()}"
 
   val producer = kafkaProducer
 
@@ -43,7 +43,7 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
   "AkkaConsumer with TopicFilter" should {
     "work with a topicFilter" in {
       val receiver = system.actorOf(Props(new TestReciever(testActor)))
-      val consumer = new AkkaConsumer(testProps(system, new Whitelist(".*"), receiver))
+      val consumer = new AkkaConsumer(testProps(system, new Blacklist("^test.*"), receiver))
       doTest(topicFilter, consumer)
       consumer.stop() pipeTo testActor
       expectMsg(())
