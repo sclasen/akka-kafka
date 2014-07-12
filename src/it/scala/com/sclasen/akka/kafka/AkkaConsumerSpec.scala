@@ -120,7 +120,7 @@ object AkkaConsumerSpec {
     connectorActorName = Some("testFSMFilter"),
     zkConnect = "localhost:2181",
     topicFilter = topicFilter,
-    group = "consumer-spec",
+    group = "consumer-filter-spec",
     streams = 2,
     keyDecoder = new DefaultDecoder(),
     msgDecoder = new DefaultDecoder(),
