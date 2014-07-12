@@ -2,8 +2,11 @@
 
 ROOT=$(cd $(dirname $0)/..; pwd)
 
-mkdir -p $ROOT/kafka-install
+if [ ! -d "$ROOT/kafka-install/kafka_2.10-0.8.1" ]; then
+    mkdir -p $ROOT/kafka-install
 
-cd $ROOT/kafka-install
+    cd $ROOT/kafka-install
 
-curl -L http://mirrors.sonic.net/apache/kafka/0.8.1/kafka_2.10-0.8.1.tgz | tar xvz
+    curl -L http://mirrors.sonic.net/apache/kafka/0.8.1/kafka_2.10-0.8.1.tgz | tar xvz
+fi
+
