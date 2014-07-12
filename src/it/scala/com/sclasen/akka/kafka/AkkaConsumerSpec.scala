@@ -103,7 +103,7 @@ object AkkaConsumerSpec {
     "metadata.broker.list" -> "localhost:9092",
     "retry.backoff.ms" -> "3000",
     "producer.type" -> "sync",
-    "request.required.acks" -> "-1")
+    "request.required.acks" -> "1")
   )
 
   def testProps(system: ActorSystem, topic: String, receiver: ActorRef) = AkkaConsumerProps.forSystem(
