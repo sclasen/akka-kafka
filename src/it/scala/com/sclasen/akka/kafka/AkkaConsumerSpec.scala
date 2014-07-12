@@ -12,6 +12,7 @@ import AkkaConsumerSpec._
 import org.scalatest._
 import akka.util.Timeout
 import kafka.consumer.{Whitelist, TopicFilter}
+import akka.pattern._
 
 
 class AkkaConsumerSpec(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
@@ -25,17 +26,23 @@ class AkkaConsumerSpec(_system: ActorSystem) extends TestKit(_system) with Impli
 
   val messages = 1000
 
+  import system.dispatcher
+
   "AkkaConsumer" should {
     "work with a topic" in {
       val receiver = system.actorOf(Props(new TestReciever(testActor)))
       val consumer = new AkkaConsumer(testProps(system, topic, receiver))
       doTest(consumer)
+      consumer.stop() pipeTo testActor
+      expectMsg(())
     }
 
     "work with a topicFilter" in {
       val receiver = system.actorOf(Props(new TestReciever(testActor)))
       val consumer = new AkkaConsumer(testProps(system, new Whitelist(".*"), receiver))
       doTest(consumer)
+      consumer.stop() pipeTo testActor
+      expectMsg(())
     }
 
     def doTest(consumer:AkkaConsumer[Array[Byte], Array[Byte]]){
