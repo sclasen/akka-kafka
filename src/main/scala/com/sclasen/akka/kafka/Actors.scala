@@ -4,8 +4,12 @@ import akka.actor._
 import concurrent.duration._
 import kafka.consumer._
 
-import ConnectorFSM._
+import com.sclasen.akka.kafka.ConnectorFSM._
 import StreamFSM._
+import scala.Some
+import com.sclasen.akka.kafka.ConnectorFSM.Drained
+import akka.actor.DeadLetter
+import akka.actor.Terminated
 
 object ConnectorFSM {
 
@@ -30,6 +34,8 @@ object ConnectorFSM {
   case object Started extends ConnectorProtocol
 
   case object Committed extends ConnectorProtocol
+
+  case object Stop extends ConnectorProtocol
 
 }
 
@@ -59,6 +65,8 @@ object StreamFSM {
 
   case object Continue extends StreamProtocol
 
+  case object Stop extends StreamProtocol
+
 }
 
 class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: ConsumerConnector) extends Actor with FSM[ConnectorState, Int] {
@@ -87,12 +95,25 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
       context.system.eventStream.subscribe(listener, classOf[DeadLetter])
 
       log.info("at=start")
-      connector.createMessageStreams(Map(topic -> streams), props.keyDecoder, props.msgDecoder).apply(topic).zipWithIndex.foreach {
-        case (stream, index) =>
-          val streamActor = context.actorOf(Props(new StreamFSM(stream, maxInFlightPerStream, receiver)), s"stream${index}")
-          listener ! streamActor
+      def startTopic(topic:String){
+        connector.createMessageStreams(Map(topic -> streams), props.keyDecoder, props.msgDecoder).apply(topic).zipWithIndex.foreach {
+          case (stream, index) =>
+            val streamActor = context.actorOf(Props(new StreamFSM(stream, maxInFlightPerStream, receiver)), s"stream${index}")
+            listener ! streamActor
+        }
       }
+      def startTopicFilter(topicFilter:TopicFilter){
+        connector.createMessageStreamsByFilter(topicFilter, streams, props.keyDecoder, props.msgDecoder).zipWithIndex.foreach {
+          case (stream, index) =>
+            val streamActor = context.actorOf(Props(new StreamFSM(stream, maxInFlightPerStream, receiver)), s"stream${index}")
+            listener ! streamActor
+        }
+      }
+
+      topicFilterOrTopic.fold(startTopicFilter, startTopic)
+
       log.info("at=created-streams")
+      context.children.foreach(println)
       context.children.foreach(_ ! Continue)
       scheduleCommit
       sender ! Started
@@ -153,9 +174,12 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
       goto(Receiving) using 0
   }
 
-  override def postStop(): Unit = {
-    connector.shutdown()
-    super.postStop()
+  whenUnhandled{
+    case Event(ConnectorFSM.Stop, _) =>
+      connector.shutdown()
+      sender() ! ConnectorFSM.Stop
+      context.children.foreach(_ ! StreamFSM.Stop)
+      stop()
   }
 
   def debugRec(msg:AnyRef, uncommitted:Int) = log.debug("state={} msg={} uncommitted={}", Receiving, msg,  uncommitted)
@@ -288,6 +312,11 @@ class StreamFSM[Key, Msg](stream: KafkaStream[Key, Msg], maxOutstanding: Int, re
     case Event(Continue, outstanding) =>
       debug(Unused, Continue, outstanding)
       goto(Processing)
+  }
+
+  whenUnhandled{
+    case Event(StreamFSM.Stop, _) =>
+      stop()
   }
 
   onTransition {

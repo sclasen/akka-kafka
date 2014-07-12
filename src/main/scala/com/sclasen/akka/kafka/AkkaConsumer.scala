@@ -7,7 +7,7 @@ import collection.JavaConverters._
 import concurrent.Future
 import concurrent.duration._
 import java.util.Properties
-import kafka.consumer.{ConsumerConfig, Consumer}
+import kafka.consumer.{TopicFilter, ConsumerConfig, Consumer}
 import kafka.serializer.Decoder
 
 object AkkaConsumer{
@@ -55,6 +55,14 @@ class AkkaConsumer[Key,Msg](props:AkkaConsumerProps[Key,Msg]) {
     }
   }
 
+  def stop():Future[Unit] = {
+    import props.system.dispatcher
+    (connector ? ConnectorFSM.Stop)(props.startTimeout).map{
+      stopped =>
+        props.system.log.info("at=consumer-started")
+    }
+  }
+
   def commit():Future[Unit] = {
     import props.system.dispatcher
     (connector ? ConnectorFSM.Commit)(props.commitConfig.commitTimeout).map{
@@ -77,7 +85,22 @@ object AkkaConsumerProps {
                       maxInFlightPerStream: Int = 64,
                       startTimeout: Timeout = Timeout(5 seconds),
                       commitConfig: CommitConfig = CommitConfig()): AkkaConsumerProps[Key, Msg] =
-    AkkaConsumerProps(system, system, zkConnect, topic, group, streams, keyDecoder, msgDecoder, receiver, connectorActorName, maxInFlightPerStream, startTimeout, commitConfig)
+    AkkaConsumerProps(system, system, zkConnect, Right(topic), group, streams, keyDecoder, msgDecoder, receiver, connectorActorName, maxInFlightPerStream, startTimeout, commitConfig)
+
+  def forSystemWithFilter[Key, Msg](system: ActorSystem,
+                          zkConnect: String,
+                          topicFilter: TopicFilter,
+                          group: String,
+                          streams: Int,
+                          keyDecoder: Decoder[Key],
+                          msgDecoder: Decoder[Msg],
+                          receiver: ActorRef,
+                          connectorActorName:Option[String] = None,
+                          maxInFlightPerStream: Int = 64,
+                          startTimeout: Timeout = Timeout(5 seconds),
+                          commitConfig: CommitConfig = CommitConfig()): AkkaConsumerProps[Key, Msg] =
+    AkkaConsumerProps(system, system, zkConnect, Left(topicFilter), group, streams, keyDecoder, msgDecoder, receiver, connectorActorName, maxInFlightPerStream, startTimeout, commitConfig)
+
 
   def forContext[Key, Msg](context: ActorContext,
                       zkConnect: String,
@@ -91,13 +114,27 @@ object AkkaConsumerProps {
                       maxInFlightPerStream: Int = 64,
                       startTimeout: Timeout = Timeout(5 seconds),
                       commitConfig: CommitConfig): AkkaConsumerProps[Key, Msg] =
-    AkkaConsumerProps(context.system, context, zkConnect, topic, group, streams, keyDecoder, msgDecoder, receiver,connectorActorName, maxInFlightPerStream, startTimeout, commitConfig)
+    AkkaConsumerProps(context.system, context, zkConnect, Right(topic), group, streams, keyDecoder, msgDecoder, receiver,connectorActorName, maxInFlightPerStream, startTimeout, commitConfig)
+
+  def forContextWithFilter[Key, Msg](context: ActorContext,
+                           zkConnect: String,
+                           topicFilter: TopicFilter,
+                           group: String,
+                           streams: Int,
+                           keyDecoder: Decoder[Key],
+                           msgDecoder: Decoder[Msg],
+                           receiver: ActorRef,
+                           connectorActorName:Option[String] = None,
+                           maxInFlightPerStream: Int = 64,
+                           startTimeout: Timeout = Timeout(5 seconds),
+                           commitConfig: CommitConfig): AkkaConsumerProps[Key, Msg] =
+    AkkaConsumerProps(context.system, context, zkConnect, Left(topicFilter), group, streams, keyDecoder, msgDecoder, receiver,connectorActorName, maxInFlightPerStream, startTimeout, commitConfig)
 }
 
 case class AkkaConsumerProps[Key,Msg](system:ActorSystem,
                                       actorRefFactory:ActorRefFactory,
                                       zkConnect:String,
-                                      topic:String,
+                                      topicFilterOrTopic:Either[TopicFilter,String],
                                       group:String,
                                       streams:Int,
                                       keyDecoder:Decoder[Key],
