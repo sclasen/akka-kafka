@@ -119,6 +119,8 @@ object Example {
 
   consumer.commit() //returns a Future[Unit] that completes when all in-flight messages are processed and offsets are committed.
 
+  consumer.stop()   //returns a Future[Unit] that completes when the connector is stopped.
+
 }
 ```
 
