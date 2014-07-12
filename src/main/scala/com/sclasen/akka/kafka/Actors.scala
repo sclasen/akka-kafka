@@ -110,7 +110,7 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
         }
       }
 
-      topicFiterOrTopic.fold(startTopicFilter, startTopic)
+      topicFilterOrTopic.fold(startTopicFilter, startTopic)
 
       log.info("at=created-streams")
       context.children.foreach(println)

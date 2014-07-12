@@ -134,7 +134,7 @@ object AkkaConsumerProps {
 case class AkkaConsumerProps[Key,Msg](system:ActorSystem,
                                       actorRefFactory:ActorRefFactory,
                                       zkConnect:String,
-                                      topicFiterOrTopic:Either[TopicFilter,String],
+                                      topicFilterOrTopic:Either[TopicFilter,String],
                                       group:String,
                                       streams:Int,
                                       keyDecoder:Decoder[Key],
