@@ -101,7 +101,7 @@ object AkkaConsumerSpec {
 
   def kafkaProducerProps = AkkaConsumer.toProps(collection.mutable.Set(
     "metadata.broker.list" -> "localhost:9092",
-    "message.send.max.retries" -> "0",
+    "message.send.max.retries" -> "1",
     "producer.type" -> "sync",
     "request.required.acks" -> "1")
   )
