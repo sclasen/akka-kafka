@@ -27,9 +27,9 @@ class AkkaConsumerSpec(_system: ActorSystem) extends TestKit(_system) with Impli
 
   "AkkaConsumer" should {
     "work with a topic" in {
-      //val receiver = system.actorOf(Props(new TestReciever(testActor)))
-      //val consumer = new AkkaConsumer(testProps(system, topic, receiver))
-      //doTest(consumer)
+      val receiver = system.actorOf(Props(new TestReciever(testActor)))
+      val consumer = new AkkaConsumer(testProps(system, topic, receiver))
+      doTest(consumer)
     }
 
     "work with a topicFilter" in {
