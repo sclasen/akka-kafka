@@ -7,7 +7,7 @@ before_script:
 - cp .env.sample .env
 - forego start &
 script:
-- forego run sbt it:test
+- forego run sbt it:compile
 jdk: openjdk7
 cache:
   directories:
