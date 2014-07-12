@@ -5,7 +5,7 @@ before_script:
 - go get github.com/ddollar/forego
 - bin/setup
 - cp .env.sample .env
-- forego start
+- forego start &
 script:
 - forego run sbt it:test
 jdk: openjdk7
