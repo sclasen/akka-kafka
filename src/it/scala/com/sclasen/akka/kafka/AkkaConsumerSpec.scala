@@ -3,24 +3,25 @@ package com.sclasen.akka.kafka
 import akka.actor.{Props, Actor, ActorRef, ActorSystem}
 import akka.testkit.{TestKit, ImplicitSender}
 import concurrent.duration._
-import kafka.producer.{KeyedMessage,ProducerConfig, Producer}
+import kafka.producer.{KeyedMessage, ProducerConfig, Producer}
 import kafka.serializer.DefaultDecoder
 
 import StreamFSM._
 import AkkaConsumerSpec._
 
 import org.scalatest._
-import akka.util.Timeout
-import kafka.consumer.{Whitelist, TopicFilter}
+import kafka.consumer.{Blacklist, Whitelist, TopicFilter}
 import akka.pattern._
 
 
 class AkkaConsumerSpec(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll  {
+with WordSpecLike with Matchers with BeforeAndAfterAll {
 
   def this() = this(ActorSystem("test"))
 
-  val topic = s"test${System.currentTimeMillis()}"
+  val singleTopic = s"test${System.currentTimeMillis()}"
+
+  val topicFilter = s"filterTest${System.currentTimeMillis()}"
 
   val producer = kafkaProducer
 
@@ -28,51 +29,54 @@ class AkkaConsumerSpec(_system: ActorSystem) extends TestKit(_system) with Impli
 
   import system.dispatcher
 
+
   "AkkaConsumer" should {
     "work with a topic" in {
       val receiver = system.actorOf(Props(new TestReciever(testActor)))
-      val consumer = new AkkaConsumer(testProps(system, topic, receiver))
-      doTest(consumer)
+      val consumer = new AkkaConsumer(testProps(system, singleTopic, receiver))
+      doTest(singleTopic, consumer)
       consumer.stop() pipeTo testActor
       expectMsg(())
-    }
-
-    "work with a topicFilter" in {
-      val receiver = system.actorOf(Props(new TestReciever(testActor)))
-      val consumer = new AkkaConsumer(testProps(system, new Whitelist(".*"), receiver))
-      doTest(consumer)
-      consumer.stop() pipeTo testActor
-      expectMsg(())
-    }
-
-    def doTest(consumer:AkkaConsumer[Array[Byte], Array[Byte]]){
-      import system.dispatcher
-      consumer.start().map{
-        _ => testActor ! ConnectorFSM.Started
-      }
-      expectMsg(2 seconds, ConnectorFSM.Started)
-
-      producer.send(new KeyedMessage(topic, 0.toString.getBytes, 0.toString.getBytes))
-      receiveOne(2 seconds)
-      consumer.commit().map {
-        _ => testActor ! ConnectorFSM.Committed
-      }
-      expectMsg(10 seconds, ConnectorFSM.Committed)
-
-      (1 to 10).foreach {
-        cycle =>
-          sendMessages()
-          receiveN(messages, 10 seconds)
-          consumer.commit().map {
-            _ => testActor ! ConnectorFSM.Committed
-          }
-          expectMsg(10 seconds, ConnectorFSM.Committed)
-      }
     }
   }
 
-  def sendMessages() {
-    (1 to messages).foreach{
+  "AkkaConsumer with TopicFilter" should {
+    "work with a topicFilter" in {
+      val receiver = system.actorOf(Props(new TestReciever(testActor)))
+      val consumer = new AkkaConsumer(testProps(system, new Blacklist("^test.*"), receiver))
+      doTest(topicFilter, consumer)
+      consumer.stop() pipeTo testActor
+      expectMsg(())
+    }
+  }
+
+  def doTest(topic:String, consumer: AkkaConsumer[Array[Byte], Array[Byte]]) {
+    consumer.start().map {
+      _ => testActor ! ConnectorFSM.Started
+    }
+    expectMsg(2 seconds, ConnectorFSM.Started)
+
+    producer.send(new KeyedMessage(topic, 0.toString.getBytes, 0.toString.getBytes))
+    receiveOne(2 seconds)
+    consumer.commit().map {
+      _ => testActor ! ConnectorFSM.Committed
+    }
+    expectMsg(10 seconds, ConnectorFSM.Committed)
+
+    (1 to 10).foreach {
+      cycle =>
+        sendMessages(topic)
+        receiveN(messages, 10 seconds)
+        consumer.commit().map {
+          _ => testActor ! ConnectorFSM.Committed
+        }
+        expectMsg(10 seconds, ConnectorFSM.Committed)
+    }
+  }
+
+
+  def sendMessages(topic:String) {
+    (1 to messages).foreach {
       num =>
         producer.send(new KeyedMessage(topic, num.toString.getBytes, num.toString.getBytes))
     }
@@ -89,7 +93,7 @@ object AkkaConsumerSpec {
 
   type Key = Array[Byte]
   type Msg = Array[Byte]
-  type MsgProducer = Producer[Key,Msg]
+  type MsgProducer = Producer[Key, Msg]
 
   def kafkaProducer = {
     new MsgProducer(new ProducerConfig(kafkaProducerProps))
@@ -101,7 +105,7 @@ object AkkaConsumerSpec {
     "request.required.acks" -> "-1")
   )
 
-  def testProps(system:ActorSystem, topic:String, receiver:ActorRef) = AkkaConsumerProps.forSystem(
+  def testProps(system: ActorSystem, topic: String, receiver: ActorRef) = AkkaConsumerProps.forSystem(
     system = system,
     connectorActorName = Some("testFSM"),
     zkConnect = "localhost:2181",
@@ -113,12 +117,12 @@ object AkkaConsumerSpec {
     receiver = receiver
   )
 
-  def testProps(system:ActorSystem, topicFilter:TopicFilter, receiver:ActorRef) = AkkaConsumerProps.forSystemWithFilter(
+  def testProps(system: ActorSystem, topicFilter: TopicFilter, receiver: ActorRef) = AkkaConsumerProps.forSystemWithFilter(
     system = system,
     connectorActorName = Some("testFSMFilter"),
     zkConnect = "localhost:2181",
     topicFilter = topicFilter,
-    group = "consumer-spec",
+    group = "consumer-filter-spec",
     streams = 2,
     keyDecoder = new DefaultDecoder(),
     msgDecoder = new DefaultDecoder(),
@@ -127,9 +131,9 @@ object AkkaConsumerSpec {
 
 }
 
-class TestReciever(testActor:ActorRef) extends Actor{
+class TestReciever(testActor: ActorRef) extends Actor {
   override def receive = {
-    case m:Any =>
+    case m: Any =>
       sender ! Processed
       testActor ! m
   }
