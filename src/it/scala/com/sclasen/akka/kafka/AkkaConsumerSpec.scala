@@ -19,7 +19,9 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
 
   def this() = this(ActorSystem("test"))
 
-  val topic = s"test${System.currentTimeMillis()}"
+  val singleTopic = s"test${System.currentTimeMillis()}"
+
+  val topicFilter = s"test${System.currentTimeMillis()}"
 
   val producer = kafkaProducer
 
@@ -31,8 +33,8 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
   "AkkaConsumer" should {
     "work with a topic" in {
       val receiver = system.actorOf(Props(new TestReciever(testActor)))
-      val consumer = new AkkaConsumer(testProps(system, topic, receiver))
-      doTest(consumer)
+      val consumer = new AkkaConsumer(testProps(system, singleTopic, receiver))
+      doTest(singleTopic, consumer)
       consumer.stop() pipeTo testActor
       expectMsg(())
     }
@@ -42,13 +44,13 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
     "work with a topicFilter" in {
       val receiver = system.actorOf(Props(new TestReciever(testActor)))
       val consumer = new AkkaConsumer(testProps(system, new Whitelist(".*"), receiver))
-      doTest(consumer)
+      doTest(topicFilter, consumer)
       consumer.stop() pipeTo testActor
       expectMsg(())
     }
   }
 
-  def doTest(consumer: AkkaConsumer[Array[Byte], Array[Byte]]) {
+  def doTest(topic:String, consumer: AkkaConsumer[Array[Byte], Array[Byte]]) {
     consumer.start().map {
       _ => testActor ! ConnectorFSM.Started
     }
@@ -63,7 +65,7 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
 
     (1 to 10).foreach {
       cycle =>
-        sendMessages()
+        sendMessages(topic)
         receiveN(messages, 10 seconds)
         consumer.commit().map {
           _ => testActor ! ConnectorFSM.Committed
@@ -73,7 +75,7 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
   }
 
 
-  def sendMessages() {
+  def sendMessages(topic:String) {
     (1 to messages).foreach {
       num =>
         producer.send(new KeyedMessage(topic, num.toString.getBytes, num.toString.getBytes))
