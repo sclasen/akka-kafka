@@ -8,10 +8,10 @@ before_script:
 - forego start &
 script:
 - forego run sbt it:test
-cache:
-  directories:
-  - "$HOME/.sbt"
-  - "$HOME/.ivy2"
-  - "kafka-install"
+#cache:
+#  directories:
+#  - "$HOME/.sbt"
+#  - "$HOME/.ivy2"
+#  - "kafka-install"
 jdk: openjdk7
 
