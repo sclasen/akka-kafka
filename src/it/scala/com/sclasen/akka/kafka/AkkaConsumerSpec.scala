@@ -11,6 +11,7 @@ import AkkaConsumerSpec._
 
 import org.scalatest._
 import akka.util.Timeout
+import kafka.consumer.{Whitelist, TopicFilter}
 
 
 class AkkaConsumerSpec(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
@@ -25,9 +26,19 @@ class AkkaConsumerSpec(_system: ActorSystem) extends TestKit(_system) with Impli
   val messages = 1000
 
   "AkkaConsumer" should {
-    "work" in {
+    "work with a topic" in {
+      //val receiver = system.actorOf(Props(new TestReciever(testActor)))
+      //val consumer = new AkkaConsumer(testProps(system, topic, receiver))
+      //doTest(consumer)
+    }
+
+    "work with a topicFilter" in {
       val receiver = system.actorOf(Props(new TestReciever(testActor)))
-      val consumer = new AkkaConsumer(testProps(system, topic, receiver))
+      val consumer = new AkkaConsumer(testProps(system, new Whitelist(".*"), receiver))
+      doTest(consumer)
+    }
+
+    def doTest(consumer:AkkaConsumer[Array[Byte], Array[Byte]]){
       import system.dispatcher
       consumer.start().map{
         _ => testActor ! ConnectorFSM.Started
@@ -42,13 +53,13 @@ class AkkaConsumerSpec(_system: ActorSystem) extends TestKit(_system) with Impli
       expectMsg(10 seconds, ConnectorFSM.Committed)
 
       (1 to 10).foreach {
-       cycle =>
-        sendMessages()
-        receiveN(messages, 5 seconds)
-        consumer.commit().map {
-          _ => testActor ! ConnectorFSM.Committed
-        }
-        expectMsg(10 seconds, ConnectorFSM.Committed)
+        cycle =>
+          sendMessages()
+          receiveN(messages, 10 seconds)
+          consumer.commit().map {
+            _ => testActor ! ConnectorFSM.Committed
+          }
+          expectMsg(10 seconds, ConnectorFSM.Committed)
       }
     }
   }
@@ -88,6 +99,18 @@ object AkkaConsumerSpec {
     connectorActorName = Some("testFSM"),
     zkConnect = "localhost:2181",
     topic = topic,
+    group = "consumer-spec",
+    streams = 2,
+    keyDecoder = new DefaultDecoder(),
+    msgDecoder = new DefaultDecoder(),
+    receiver = receiver
+  )
+
+  def testProps(system:ActorSystem, topicFilter:TopicFilter, receiver:ActorRef) = AkkaConsumerProps.forSystemWithFilter(
+    system = system,
+    connectorActorName = Some("testFSMFilter"),
+    zkConnect = "localhost:2181",
+    topicFilter = topicFilter,
     group = "consumer-spec",
     streams = 2,
     keyDecoder = new DefaultDecoder(),

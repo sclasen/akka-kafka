@@ -87,12 +87,25 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
       context.system.eventStream.subscribe(listener, classOf[DeadLetter])
 
       log.info("at=start")
-      connector.createMessageStreams(Map(topic -> streams), props.keyDecoder, props.msgDecoder).apply(topic).zipWithIndex.foreach {
-        case (stream, index) =>
-          val streamActor = context.actorOf(Props(new StreamFSM(stream, maxInFlightPerStream, receiver)), s"stream${index}")
-          listener ! streamActor
+      def startTopic(topic:String){
+        connector.createMessageStreams(Map(topic -> streams), props.keyDecoder, props.msgDecoder).apply(topic).zipWithIndex.foreach {
+          case (stream, index) =>
+            val streamActor = context.actorOf(Props(new StreamFSM(stream, maxInFlightPerStream, receiver)), s"stream${index}")
+            listener ! streamActor
+        }
       }
+      def startTopicFilter(topicFilter:TopicFilter){
+        connector.createMessageStreamsByFilter(topicFilter, streams, props.keyDecoder, props.msgDecoder).zipWithIndex.foreach {
+          case (stream, index) =>
+            val streamActor = context.actorOf(Props(new StreamFSM(stream, maxInFlightPerStream, receiver)), s"stream${index}")
+            listener ! streamActor
+        }
+      }
+
+      topicFiterOrTopic.fold(startTopicFilter, startTopic)
+
       log.info("at=created-streams")
+      context.children.foreach(println)
       context.children.foreach(_ ! Continue)
       scheduleCommit
       sender ! Started
