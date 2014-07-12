@@ -4,6 +4,7 @@ scala:
 before_script:
 - go get github.com/ddollar/forego
 - bin/setup
+- cp .env.sample .env
 script:
 - sbt it:test
 jdk: openjdk7

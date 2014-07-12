@@ -2,7 +2,7 @@
 
 ROOT=$(cd $(dirname $0)/..; pwd)
 
-if [ ! -d "$ROOT/kafka-install/kafka_2.10-0.8.1" ]; then
+if [ ! -d "$ROOT/kafka-install/kafka_2.10-0.8.1.1" ]; then
     mkdir -p $ROOT/kafka-install
 
     cd $ROOT/kafka-install
