@@ -10,6 +10,7 @@ import scala.Some
 import com.sclasen.akka.kafka.ConnectorFSM.Drained
 import akka.actor.DeadLetter
 import akka.actor.Terminated
+import kafka.message.MessageAndMetadata
 
 object ConnectorFSM {
 
@@ -98,14 +99,14 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
       def startTopic(topic:String){
         connector.createMessageStreams(Map(topic -> streams), props.keyDecoder, props.msgDecoder).apply(topic).zipWithIndex.foreach {
           case (stream, index) =>
-            val streamActor = context.actorOf(Props(new StreamFSM(stream, maxInFlightPerStream, receiver)), s"stream${index}")
+            val streamActor = context.actorOf(Props(new StreamFSM(stream, maxInFlightPerStream, receiver, msgHandler)), s"stream${index}")
             listener ! streamActor
         }
       }
       def startTopicFilter(topicFilter:TopicFilter){
         connector.createMessageStreamsByFilter(topicFilter, streams, props.keyDecoder, props.msgDecoder).zipWithIndex.foreach {
           case (stream, index) =>
-            val streamActor = context.actorOf(Props(new StreamFSM(stream, maxInFlightPerStream, receiver)), s"stream${index}")
+            val streamActor = context.actorOf(Props(new StreamFSM(stream, maxInFlightPerStream, receiver, msgHandler)), s"stream${index}")
             listener ! streamActor
         }
       }
@@ -188,7 +189,7 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
 
 }
 
-class StreamFSM[Key, Msg](stream: KafkaStream[Key, Msg], maxOutstanding: Int, receiver: ActorRef) extends Actor with FSM[StreamState, Int] {
+class StreamFSM[Key, Msg](stream: KafkaStream[Key, Msg], maxOutstanding: Int, receiver: ActorRef, msgHandler: (MessageAndMetadata[Key,Msg]) => Any) extends Actor with FSM[StreamState, Int] {
 
   lazy val msgIterator = stream.iterator()
   val conn = context.parent
@@ -208,7 +209,7 @@ class StreamFSM[Key, Msg](stream: KafkaStream[Key, Msg], maxOutstanding: Int, re
        goto(Full)
     /* ok to process, and msg available */
     case Event(Continue, outstanding) if hasNext() =>
-      val msg = msgIterator.next().message()
+      val msg = msgHandler(msgIterator.next())
       conn ! Received
       debug(Processing, Continue, outstanding +1)
       receiver ! msg
