@@ -60,7 +60,7 @@ class AkkaConsumer[Key,Msg](props:AkkaConsumerProps[Key,Msg]) {
     import props.system.dispatcher
     (connector ? ConnectorFSM.Stop)(props.startTimeout).map{
       stopped =>
-        props.system.log.info("at=consumer-started")
+        props.system.log.info("at=consumer-stopped")
     }
   }
 
