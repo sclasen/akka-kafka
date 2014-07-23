@@ -32,7 +32,7 @@ To use this library you must provide it with an actorRef that will receive messa
 with `StreamFSM.Processed` after a message has been successfully processed.  If you do not reply in this way to every single message received, the connector will not be able
 to drain all in-flight messages at commit time, and will hang.
 
-Note that the sender in this case is not the` ConnectorFSM` actor, but one of the` StreamFSM` actors that are the connector's children. You need to reply to
+Note that the sender in this case is not the `ConnectorFSM` actor, but one of the `StreamFSM` actors that are the connector's children. You need to reply to
 the `sender()`, a `StreamFSM` rather than the connector itself so each stream can track the number of outstanding messages correctly.
 
 Here is an example of such an actor that just prints the messages.
