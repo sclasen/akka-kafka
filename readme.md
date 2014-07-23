@@ -21,7 +21,7 @@ If you dont want to use slf4j, you can substitute log4j.
 ```scala
 /* build.sbt */
 
-libraryDependencies += "com.sclasen" %% "akka-kafka" % "0.0.5" % "compile"
+libraryDependencies += "com.sclasen" %% "akka-kafka" % "0.0.6" % "compile"
 
 libraryDependencies += "com.typesafe.akka" %% "akka-slf4j" % "2.3.2" % "compile"
 
@@ -31,6 +31,9 @@ libraryDependencies += "org.slf4j" % "log4j-over-slf4j" % "1.6.6" % "compile"
 To use this library you must provide it with an actorRef that will receive messages from kafka, and will reply to the sender
 with `StreamFSM.Processed` after a message has been successfully processed.  If you do not reply in this way to every single message received, the connector will not be able
 to drain all in-flight messages at commit time, and will hang.
+
+Note that the sender in this case is not the` ConnectorFSM` actor, but one of the` StreamFSM` actors that are the connector's children. You need to reply to
+the `sender()`, a `StreamFSM` rather than the connector itself so each stream can track the number of outstanding messages correctly.
 
 Here is an example of such an actor that just prints the messages.
 
@@ -58,6 +61,7 @@ case class AkkaConsumerProps[Key,Msg](system:ActorSystem,
                                       streams:Int,
                                       keyDecoder:Decoder[Key],
                                       msgDecoder:Decoder[Msg],
+                                      msgHandler: (MessageAndMetadata[Key,Msg]) => Any,
                                       receiver: ActorRef,
                                       maxInFlightPerStream:Int = 64,
                                       startTimeout:Timeout = Timeout(5 seconds),
