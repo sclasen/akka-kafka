@@ -19,11 +19,11 @@ import com.sclasen.akka.kafka.BatchConnectorFSM.{Batch, BatchProcessed}
 class AkkaBatchConsumerSpec(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
 with WordSpecLike with Matchers with BeforeAndAfterAll {
 
-  def this() = this(ActorSystem("test"))
+  def this() = this(ActorSystem("batch-test"))
 
-  val singleTopic = s"test${System.currentTimeMillis()}"
+  val singleTopic = s"batchTest${System.currentTimeMillis()}"
 
-  val topicFilter = s"filterTest${System.currentTimeMillis()}"
+  val topicFilter = s"batchFilterTest${System.currentTimeMillis()}"
 
   val producer = kafkaProducer
 
@@ -55,10 +55,8 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
         sendMessages(topic)
 
         val batch = expectMsgPF(){
-          case b:BatchConnectorFSM.Batch[Array[Byte]]  => b
+          case b:(BatchConnectorFSM.Batch[Array[Byte]] @unchecked)  => b
         }
-
-        println("=========>"+batch.items.size)
 
     }
 
@@ -72,11 +70,8 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
     (1 to 10).foreach {
       cycle =>
         val batch = expectMsgPF(){
-          case b:BatchConnectorFSM.Batch[Array[Byte]]   => b
+          case b:(BatchConnectorFSM.Batch[Array[Byte]] @unchecked)  => b
         }
-
-        println("=========>"+batch.items.size)
-
 
     }
   }
@@ -134,7 +129,7 @@ object AkkaBatchConsumerSpec {
 
 class TestBatchReciever(testActor: ActorRef) extends Actor {
   override def receive = {
-    case b:Batch[Array[Byte]]  =>
+    case b:(Batch[Array[Byte]] @unchecked) =>
       sender ! BatchProcessed
       testActor ! b
   }

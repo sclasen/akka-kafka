@@ -4,11 +4,20 @@ akka-kafka
 
 Actor based kafka consumer built on top of the high level kafka consumer.
 
+AkkaConsumer
+------------
+
 Manages backpressure so the consumer doesn't overwhelm other parts of the system.
 The consumer allows asynchronous/concurrent processing of a configurable, bounded number of in-flight messages.
 
 You can configure the connector to commit offsets at a configurable interval, after a configured number of messages are processed, or simply commit the offsets programatically.
 It waits until all in flight messages are processed at commit time, so you know that everything that's committed has been processed.
+
+AkkaBatchConsumer
+-----------------
+
+Configured and used very similarly to the `AkkaConsumer` but it accumulates a batch of messages, with a configured maximum size and timeout, and sends
+the batch to your `ActorRef`, you reply with `BatchConnectorFSM.BatchProcessed` and the batch consumer will commit the batch and accumulate a new one.
 
 use
 ===
@@ -28,7 +37,10 @@ libraryDependencies += "com.typesafe.akka" %% "akka-slf4j" % "2.3.2" % "compile"
 libraryDependencies += "org.slf4j" % "log4j-over-slf4j" % "1.6.6" % "compile"
 ```
 
-To use this library you must provide it with an actorRef that will receive messages from kafka, and will reply to the sender
+AkkaConsumer
+------------
+
+To use this consumer you must provide it with an actorRef that will receive messages from kafka, and will reply to the sender
 with `StreamFSM.Processed` after a message has been successfully processed.  If you do not reply in this way to every single message received, the connector will not be able
 to drain all in-flight messages at commit time, and will hang.
 
@@ -151,6 +163,58 @@ kafka.consumer {
 ```
 
 
+AkkaBatchConsumer
+-----------------
+
+To use this consumer you must provide it with an actorRef that will receive a Batch of messages from kafka, and will reply to the sender
+with `BatchConnectorFSM.BatchProcessed` after a batch has been successfully processed.  If you do not reply in this way to every single batch received, the connector will not be able
+to commit the batch, and will hang.
+
+`AkkaBatchConsumerProps` has similar convenience methods to `AkkaConsumerProps`
+
+So a full example of getting a batch consumer up and running looks like this.
+
+```scala
+import akka.actor.{Props, ActorSystem, Actor}
+import com.sclasen.akka.kafka.{AkkaBatchConsumer, AkkaBatchConsumerProps, BatchConnectorFSM}
+import kafka.serializer.DefaultDecoder
+
+object BatchExample {
+  class BatchPrinter extends Actor{
+    def receive = {
+      case Batch(xs) =>
+        xs.foreach(println)
+        sender ! BatchConnectorFSM.BatchProcessed
+    }
+  }
+
+  val system = ActorSystem("batchTest")
+  val printer = system.actorOf(Props[BatchPrinter])
+
+
+  /*
+  the consumer will have 4 streams and accumulate a batch of up to 1000 messages before sending the batch.
+  if no message is received for 1 second, the partial batch is sent instead.
+  */
+  val consumerProps = AkkaBatchConsumerProps.forSystem(
+    system = system,
+    zkConnect = "localhost:2181",
+    topic = "your-kafka-topic",
+    group = "your-consumer-group",
+    streams = 4, //one per partition
+    keyDecoder = new DefaultDecoder(),
+    msgDecoder = new DefaultDecoder(),
+    receiver = printer
+  )
+
+  val consumer = new AkkaBatchConsumer(consumerProps)
+
+  consumer.start()  //returns a Future[Unit] that completes when the connector is started
+
+  consumer.stop()   //returns a Future[Unit] that completes when the connector is stopped.
+
+}
+```
 
 develop
 =======

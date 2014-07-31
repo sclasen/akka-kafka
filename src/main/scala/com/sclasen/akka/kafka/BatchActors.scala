@@ -31,11 +31,7 @@ object BatchConnectorFSM {
 
   case object StreamUnused extends BatchConnectorProtocol
 
-  case object Commit extends BatchConnectorProtocol
-
   case object Started extends BatchConnectorProtocol
-
-  case object Committed extends BatchConnectorProtocol
 
   case object Stop extends BatchConnectorProtocol
 
@@ -47,13 +43,9 @@ object BatchStreamFSM {
 
   case object Processing extends BatchStreamState
 
-  case object Waiting extends BatchStreamState
-
   case object Unused extends BatchStreamState
 
   sealed trait BatchStreamProtocol
-
-  case object StartProcessing extends BatchStreamProtocol
 
   case object Continue extends BatchStreamProtocol
 
@@ -108,14 +100,14 @@ class BatchConnectorFSM[Key, Msg, Out](props: AkkaBatchConsumerProps[Key, Msg, O
   }
 
   when(Receiving, props.batchTimeout.duration) {
-    case Event(Received(b:Out), outstanding) if batch.size < props.batchSize - props.streams =>
+    case Event(Received(b:Out @unchecked), outstanding) if batch.size < props.batchSize - props.streams =>
       batch += b
       debugRec(Received, batch.size, outstanding)
       sender() ! Continue
       stay()
     case Event(StreamUnused, outstanding) =>
       stay using outstanding -1
-    case Event(Received(b:Out), outstanding) =>
+    case Event(Received(b:Out @unchecked), outstanding) =>
       batch += b
       debugRec(Received, batch.size, outstanding)
       goto(Committing) using outstanding - 1
@@ -134,13 +126,13 @@ class BatchConnectorFSM[Key, Msg, Out](props: AkkaBatchConsumerProps[Key, Msg, O
       stay() using 0
     case Event(StreamUnused, outstanding) =>
       stay using outstanding - 1
-    case Event(Received(b:Out), outstanding) if outstanding == 1 =>
+    case Event(Received(b:Out @unchecked), outstanding) if outstanding == 1 =>
       batch += b
       log.info("at=drain-finised")
       sendBatch()
       log.info("at=committed-offsets")
       stay using 0
-    case Event(Received(b:Out), outstanding) =>
+    case Event(Received(b:Out @unchecked), outstanding) =>
       batch += b
       stay using outstanding -1
     case Event(BatchProcessed, _) =>
