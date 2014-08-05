@@ -179,14 +179,16 @@ import akka.actor.{Props, ActorSystem, Actor}
 import com.sclasen.akka.kafka.{AkkaBatchConsumer, AkkaBatchConsumerProps, BatchConnectorFSM}
 import kafka.serializer.DefaultDecoder
 
-object BatchExample {
+//object BatchExample {
   class BatchPrinter extends Actor{
     def receive = {
-      case Batch(xs) =>
+      case BatchConnectorFSM.Batch(xs) =>
         xs.foreach(println)
         sender ! BatchConnectorFSM.BatchProcessed
     }
   }
+
+  type B = Array[Byte]
 
   val system = ActorSystem("batchTest")
   val printer = system.actorOf(Props[BatchPrinter])
@@ -196,7 +198,7 @@ object BatchExample {
   the consumer will have 4 streams and accumulate a batch of up to 1000 messages before sending the batch.
   if no message is received for 1 second, the partial batch is sent instead.
   */
-  val consumerProps = AkkaBatchConsumerProps.forSystem(
+  val consumerProps = AkkaBatchConsumerProps.forSystem[B,B,B](
     system = system,
     zkConnect = "localhost:2181",
     topic = "your-kafka-topic",
