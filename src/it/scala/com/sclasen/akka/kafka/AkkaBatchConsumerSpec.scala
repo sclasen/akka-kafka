@@ -49,6 +49,8 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
     }
     expectMsg(2 seconds, BatchConnectorFSM.Started)
 
+    /*test that we are ok after a recieve timeout*/
+    expectNoMsg()
 
     (1 to 10).foreach {
       cycle =>

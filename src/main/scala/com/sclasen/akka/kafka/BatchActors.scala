@@ -106,12 +106,20 @@ class BatchConnectorFSM[Key, Msg, Out](props: AkkaBatchConsumerProps[Key, Msg, O
       sender() ! Continue
       stay()
     case Event(StreamUnused, outstanding) =>
+      debugRec(StreamUnused, batch.size, outstanding)
       stay using outstanding -1
     case Event(Received(b:Out @unchecked), outstanding) =>
       batch += b
       debugRec(Received, batch.size, outstanding)
       goto(Committing) using outstanding - 1
+    case Event(StateTimeout, outstanding) if batch.size == 0 =>
+      debugRec(StateTimeout, 0, outstanding)
+      log.debug("at=nothing-to-commit outstanding={} batch-size={}", outstanding, batch.size)
+      context.children.foreach(_ ! Continue)
+      stay() using outstanding + props.streams
     case Event(StateTimeout, outstanding) =>
+      debugRec(StateTimeout, 0, outstanding)
+      log.info("at=recieve-timeout outstanding={} batch-size={}", outstanding, batch.size)
       goto(Committing)
   }
 
