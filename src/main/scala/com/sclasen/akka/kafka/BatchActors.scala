@@ -124,6 +124,11 @@ class BatchConnectorFSM[Key, Msg, Out](props: AkkaBatchConsumerProps[Key, Msg, O
   }
 
   when(Committing, stateTimeout = 1 seconds) {
+    case Event(StateTimeout, outstanding) if outstanding == 0 =>
+      log.info("at=drain-finised")
+      sendBatch()
+      log.info("at=committed-offsets")
+      stay() using 0
     case Event(StateTimeout, outstanding) =>
       log.warning("state={} msg={} outstanding={} streams={}", Committing, StateTimeout, outstanding, streams)
       stay()
