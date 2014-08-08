@@ -35,6 +35,8 @@ object BatchConnectorFSM {
 
   case object Stop extends BatchConnectorProtocol
 
+  case object SendBatch extends BatchConnectorProtocol
+
 }
 
 object BatchStreamFSM {
@@ -124,27 +126,20 @@ class BatchConnectorFSM[Key, Msg, Out](props: AkkaBatchConsumerProps[Key, Msg, O
   }
 
   when(Committing, stateTimeout = 1 seconds) {
+    case Event(SendBatch, 0) =>
+      sendBatchAndStay()
     case Event(StateTimeout, outstanding) if outstanding == 0 =>
-      log.info("at=drain-finised")
-      sendBatch()
-      log.info("at=committed-offsets")
-      stay() using 0
+      sendBatchAndStay()
     case Event(StateTimeout, outstanding) =>
       log.warning("state={} msg={} outstanding={} streams={}", Committing, StateTimeout, outstanding, streams)
       stay()
     case Event(StreamUnused, outstanding) if outstanding == 1 =>
-      log.info("at=drain-finised")
-      sendBatch()
-      log.info("at=committed-offsets")
-      stay() using 0
+      sendBatchAndStay()
     case Event(StreamUnused, outstanding) =>
       stay using outstanding - 1
     case Event(Received(b:Out @unchecked), outstanding) if outstanding == 1 =>
       batch += b
-      log.info("at=drain-finised")
-      sendBatch()
-      log.info("at=committed-offsets")
-      stay using 0
+      sendBatchAndStay()
     case Event(Received(b:Out @unchecked), outstanding) =>
       batch += b
       stay using outstanding -1
@@ -161,6 +156,18 @@ class BatchConnectorFSM[Key, Msg, Out](props: AkkaBatchConsumerProps[Key, Msg, O
       sender() ! BatchConnectorFSM.Stop
       context.children.foreach(_ ! BatchStreamFSM.Stop)
       stop()
+  }
+
+  onTransition{
+    //when we transistion fron Receiving to Committing with 0 outstanding, immeduately send batch
+    case Receiving -> Committing if nextStateData == 0 => self ! SendBatch
+  }
+
+  def sendBatchAndStay() = {
+    log.info("at=drain-finised")
+    sendBatch()
+    log.info("at=committed-offsets")
+    stay using 0
   }
 
   def sendBatch() = {
