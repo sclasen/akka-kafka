@@ -57,7 +57,7 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
         sendMessages(topic)
 
         val batch = expectMsgPF(){
-          case b:(BatchConnectorFSM.Batch[Array[Byte]] @unchecked)  => b
+          case b:(BatchConnectorFSM.Batch[Array[Byte]])  => b
         }
 
     }
@@ -72,7 +72,7 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
     (1 to 10).foreach {
       cycle =>
         val batch = expectMsgPF(){
-          case b:(BatchConnectorFSM.Batch[Array[Byte]] @unchecked)  => b
+          case b:(BatchConnectorFSM.Batch[Array[Byte]])  => b
         }
 
     }
@@ -131,7 +131,7 @@ object AkkaBatchConsumerSpec {
 
 class TestBatchReciever(testActor: ActorRef) extends Actor {
   override def receive = {
-    case b:(Batch[Array[Byte]] @unchecked) =>
+    case b:(Batch[Array[Byte]]) =>
       sender ! BatchProcessed
       testActor ! b
   }

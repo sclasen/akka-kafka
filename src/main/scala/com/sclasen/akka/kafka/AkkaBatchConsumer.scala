@@ -10,9 +10,10 @@ import java.util.Properties
 import kafka.consumer.{TopicFilter, ConsumerConfig, Consumer}
 import kafka.serializer.Decoder
 import kafka.message.MessageAndMetadata
+import scala.reflect.ClassTag
 
 
-class AkkaBatchConsumer[Key,Msg,Out](props:AkkaBatchConsumerProps[Key,Msg,Out]) {
+class AkkaBatchConsumer[Key,Msg,Out:ClassTag](props:AkkaBatchConsumerProps[Key,Msg,Out]) {
 
   import AkkaConsumer._
 
@@ -58,7 +59,7 @@ class AkkaBatchConsumer[Key,Msg,Out](props:AkkaBatchConsumerProps[Key,Msg,Out]) 
 }
 
 object AkkaBatchConsumerProps{
-  def forSystem[Key, Msg, Out](system: ActorSystem,
+  def forSystem[Key, Msg, Out:ClassTag](system: ActorSystem,
                           zkConnect: String,
                           topic: String,
                           group: String,
@@ -73,7 +74,7 @@ object AkkaBatchConsumerProps{
                           startTimeout: Timeout = Timeout(5 seconds)): AkkaBatchConsumerProps[Key, Msg, Out] =
     AkkaBatchConsumerProps(system, system, zkConnect, Right(topic), group, streams, keyDecoder, msgDecoder, msgHandler, receiver, connectorActorName, batchSize, batchTimeout, startTimeout)
 
-  def forSystemWithFilter[Key, Msg, Out](system: ActorSystem,
+  def forSystemWithFilter[Key, Msg, Out:ClassTag](system: ActorSystem,
                                     zkConnect: String,
                                     topicFilter: TopicFilter,
                                     group: String,
@@ -89,7 +90,7 @@ object AkkaBatchConsumerProps{
     AkkaBatchConsumerProps(system, system, zkConnect, Left(topicFilter), group, streams, keyDecoder, msgDecoder, msgHandler, receiver, connectorActorName, batchSize, batchTimeout, startTimeout)
 
 
-  def forContext[Key, Msg, Out](context: ActorContext,
+  def forContext[Key, Msg, Out:ClassTag](context: ActorContext,
                            zkConnect: String,
                            topic: String,
                            group: String,
@@ -104,7 +105,7 @@ object AkkaBatchConsumerProps{
                            startTimeout: Timeout = Timeout(5 seconds)): AkkaBatchConsumerProps[Key, Msg, Out] =
     AkkaBatchConsumerProps(context.system, context, zkConnect, Right(topic), group, streams, keyDecoder, msgDecoder, msgHandler, receiver, connectorActorName, batchSize, batchTimeout, startTimeout)
 
-  def forContextWithFilter[Key, Msg, Out](context: ActorContext,
+  def forContextWithFilter[Key, Msg, Out:ClassTag](context: ActorContext,
                                      zkConnect: String,
                                      topicFilter: TopicFilter,
                                      group: String,
@@ -122,7 +123,7 @@ object AkkaBatchConsumerProps{
   def defaultHandler[Key,Msg]: (MessageAndMetadata[Key,Msg]) => Msg = msg => msg.message()
 }
 
-case class AkkaBatchConsumerProps[Key,Msg,Out](system:ActorSystem,
+case class AkkaBatchConsumerProps[Key,Msg,Out:ClassTag](system:ActorSystem,
                                       actorRefFactory:ActorRefFactory,
                                       zkConnect:String,
                                       topicFilterOrTopic:Either[TopicFilter,String],

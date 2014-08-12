@@ -8,6 +8,7 @@ import akka.actor.Terminated
 import kafka.message.MessageAndMetadata
 import com.sclasen.akka.kafka.BatchConnectorFSM._
 import com.sclasen.akka.kafka.BatchStreamFSM._
+import scala.reflect.ClassTag
 
 object BatchConnectorFSM {
 
@@ -23,9 +24,9 @@ object BatchConnectorFSM {
 
   case object Start extends BatchConnectorProtocol
 
-  case class Received[Item](item:Item) extends BatchConnectorProtocol
+  case class Received[Item : ClassTag](item:Item) extends BatchConnectorProtocol
 
-  case class Batch[Item](items:IndexedSeq[Item]) extends BatchConnectorProtocol
+  case class Batch[Item : ClassTag](items:IndexedSeq[Item]) extends BatchConnectorProtocol
 
   case object BatchProcessed extends BatchConnectorProtocol
 
@@ -56,7 +57,7 @@ object BatchStreamFSM {
 }
 
 //the data here is the number of Continues outstanding to streams
-class BatchConnectorFSM[Key, Msg, Out](props: AkkaBatchConsumerProps[Key, Msg, Out], connector: ConsumerConnector) extends Actor with FSM[BatchConnectorState, Int] {
+class BatchConnectorFSM[Key, Msg, Out:ClassTag](props: AkkaBatchConsumerProps[Key, Msg, Out], connector: ConsumerConnector) extends Actor with FSM[BatchConnectorState, Int] {
 
   import props._
   import context.dispatcher
@@ -102,7 +103,7 @@ class BatchConnectorFSM[Key, Msg, Out](props: AkkaBatchConsumerProps[Key, Msg, O
   }
 
   when(Receiving, props.batchTimeout.duration) {
-    case Event(Received(b:Out @unchecked), outstanding) if batch.size < props.batchSize - props.streams =>
+    case Event(Received(b:Out), outstanding) if batch.size < props.batchSize - props.streams =>
       batch += b
       debugRec(Received, batch.size, outstanding)
       sender() ! Continue
@@ -110,7 +111,7 @@ class BatchConnectorFSM[Key, Msg, Out](props: AkkaBatchConsumerProps[Key, Msg, O
     case Event(StreamUnused, outstanding) =>
       debugRec(StreamUnused, batch.size, outstanding)
       stay using outstanding -1
-    case Event(Received(b:Out @unchecked), outstanding) =>
+    case Event(Received(b:Out), outstanding) =>
       batch += b
       debugRec(Received, batch.size, outstanding)
       goto(Committing) using outstanding - 1
@@ -137,10 +138,10 @@ class BatchConnectorFSM[Key, Msg, Out](props: AkkaBatchConsumerProps[Key, Msg, O
       sendBatchAndStay()
     case Event(StreamUnused, outstanding) =>
       stay using outstanding - 1
-    case Event(Received(b:Out @unchecked), outstanding) if outstanding == 1 =>
+    case Event(Received(b:Out), outstanding) if outstanding == 1 =>
       batch += b
       sendBatchAndStay()
-    case Event(Received(b:Out @unchecked), outstanding) =>
+    case Event(Received(b:Out), outstanding) =>
       batch += b
       stay using outstanding -1
     case Event(BatchProcessed, _) =>
@@ -183,7 +184,7 @@ class BatchConnectorFSM[Key, Msg, Out](props: AkkaBatchConsumerProps[Key, Msg, O
 }
 
 
-class BatchStreamFSM[Key, Msg, Out](stream: KafkaStream[Key, Msg],receiver: ActorRef, msgHandler: (MessageAndMetadata[Key,Msg]) => Out) extends Actor with FSM[BatchStreamState, Int] {
+class BatchStreamFSM[Key, Msg, Out:ClassTag](stream: KafkaStream[Key, Msg],receiver: ActorRef, msgHandler: (MessageAndMetadata[Key,Msg]) => Out) extends Actor with FSM[BatchStreamState, Int] {
 
   lazy val msgIterator = stream.iterator()
   val conn = context.parent
