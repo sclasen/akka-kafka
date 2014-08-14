@@ -168,7 +168,7 @@ AkkaBatchConsumer
 
 To use this consumer you must provide it with an actorRef that will receive a Batch of messages from kafka, and will reply to the sender
 with `BatchConnectorFSM.BatchProcessed` after a batch has been successfully processed.  If you do not reply in this way to every single batch received, the connector will not be able
-to commit the batch, and will hang.
+to commit the batch, and will hang. 
 
 `AkkaBatchConsumerProps` has similar convenience methods to `AkkaConsumerProps`
 
@@ -182,13 +182,21 @@ import kafka.serializer.DefaultDecoder
 //object BatchExample {
   class BatchPrinter extends Actor{
     def receive = {
-      case BatchConnectorFSM.Batch(xs) =>
+      case MyBatch(xs) =>
         xs.foreach(println)
         sender ! BatchConnectorFSM.BatchProcessed
     }
   }
 
   type B = Array[Byte]
+
+  case class MyBatch(msgs: IndexedSeq[String])
+
+  /*provide a function that makes your batch object from an IndexedSeq of messages, if desired.*/
+  def makeBatch(msgs: IndexedSeq[String]):MyBatch = MyBatch(msgs)
+
+  /*provide a function that transforms the kafka message payload, if desired.*/
+  def messageHandler(msg: Array[Byte]):String = new String(msg)
 
   val system = ActorSystem("batchTest")
   val printer = system.actorOf(Props[BatchPrinter])
@@ -198,7 +206,7 @@ import kafka.serializer.DefaultDecoder
   the consumer will have 4 streams and accumulate a batch of up to 1000 messages before sending the batch.
   if no message is received for 1 second, the partial batch is sent instead.
   */
-  val consumerProps = AkkaBatchConsumerProps.forSystem[B,B,B](
+  val consumerProps = AkkaBatchConsumerProps.forSystem[B,B,String,MyBatch](
     system = system,
     zkConnect = "localhost:2181",
     topic = "your-kafka-topic",
@@ -206,6 +214,8 @@ import kafka.serializer.DefaultDecoder
     streams = 4, //one per partition
     keyDecoder = new DefaultDecoder(),
     msgDecoder = new DefaultDecoder(),
+    msgHandler = messageHandler(_),
+    batchHandler = makeBatch(_),
     receiver = printer
   )
 
