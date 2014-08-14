@@ -24,9 +24,9 @@ object BatchConnectorFSM {
 
   case object Start extends BatchConnectorProtocol
 
-  case class Received[Item : ClassTag](item:Item) extends BatchConnectorProtocol
+  case class Received[Item](item:Item) extends BatchConnectorProtocol
 
-  case class Batch[Item : ClassTag](items:IndexedSeq[Item]) extends BatchConnectorProtocol
+  case class Batch[Item](items:IndexedSeq[Item]) extends BatchConnectorProtocol
 
   case object BatchProcessed extends BatchConnectorProtocol
 
@@ -57,7 +57,7 @@ object BatchStreamFSM {
 }
 
 //the data here is the number of Continues outstanding to streams
-class BatchConnectorFSM[Key, Msg, Out:ClassTag](props: AkkaBatchConsumerProps[Key, Msg, Out], connector: ConsumerConnector) extends Actor with FSM[BatchConnectorState, Int] {
+class BatchConnectorFSM[Key, Msg, Out:ClassTag, BatchOut](props: AkkaBatchConsumerProps[Key, Msg, Out, BatchOut], connector: ConsumerConnector) extends Actor with FSM[BatchConnectorState, Int] {
 
   import props._
   import context.dispatcher
@@ -174,7 +174,7 @@ class BatchConnectorFSM[Key, Msg, Out:ClassTag](props: AkkaBatchConsumerProps[Ke
   def sendBatch() = {
     val toSend = batch
     batch =  new collection.mutable.ArrayBuffer[Out](props.batchSize)
-    props.receiver ! Batch(toSend)
+    props.receiver ! batchHandler(batch)
   }
 
   def debugRec(msg:AnyRef, batch:Int, out:Int) = log.debug("state={} msg={} batch={} out={}", Receiving, msg,  batch, out)

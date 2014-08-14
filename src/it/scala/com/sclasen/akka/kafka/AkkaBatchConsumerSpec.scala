@@ -43,7 +43,7 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
   }
 
 
-  def doTest(topic:String, consumer: AkkaBatchConsumer[Array[Byte], Array[Byte], Array[Byte]]) {
+  def doTest(topic:String, consumer: AkkaBatchConsumer[Array[Byte], Array[Byte], Array[Byte],SpecificallyTypedBatch]) {
     consumer.start().map {
       _ => testActor ! BatchConnectorFSM.Started
     }
@@ -57,7 +57,7 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
         sendMessages(topic)
 
         val batch = expectMsgPF(){
-          case b:(BatchConnectorFSM.Batch[Array[Byte]])  => b
+          case s:SpecificallyTypedBatch  => s
         }
 
     }
@@ -72,7 +72,7 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
     (1 to 10).foreach {
       cycle =>
         val batch = expectMsgPF(){
-          case b:(BatchConnectorFSM.Batch[Array[Byte]])  => b
+          case s:SpecificallyTypedBatch  => s
         }
 
     }
@@ -109,7 +109,7 @@ object AkkaBatchConsumerSpec {
     "request.required.acks" -> "-1")
   )
 
-  def testProps(system: ActorSystem, topic: String, receiver: ActorRef) = AkkaBatchConsumerProps[Array[Byte],Array[Byte],Array[Byte]](
+  def testProps(system: ActorSystem, topic: String, receiver: ActorRef) = AkkaBatchConsumerProps[Array[Byte],Array[Byte],Array[Byte],SpecificallyTypedBatch](
     system = system,
     actorRefFactory = system,
     connectorActorName = Some("testBatchFSM"),
@@ -120,10 +120,15 @@ object AkkaBatchConsumerSpec {
     keyDecoder = new DefaultDecoder(),
     msgDecoder = new DefaultDecoder(),
     receiver = receiver,
-    msgHandler = handler(_)
+    msgHandler = handler(_),
+    batchHandler = batch(_)
   )
 
+  case class SpecificallyTypedBatch(msgs: IndexedSeq[Array[Byte]])
+
   def handler(mm:MessageAndMetadata[Array[Byte],Array[Byte]]):Array[Byte] = mm.message()
+
+  def batch(msgs:IndexedSeq[Array[Byte]]):SpecificallyTypedBatch = SpecificallyTypedBatch(msgs)
 
 
 
@@ -131,9 +136,10 @@ object AkkaBatchConsumerSpec {
 
 class TestBatchReciever(testActor: ActorRef) extends Actor {
   override def receive = {
-    case b:(Batch[Array[Byte]]) =>
+    case s: SpecificallyTypedBatch =>
+      println("==================>GOT SpecificallyTypedBatch")
       sender ! BatchProcessed
-      testActor ! b
+      testActor ! s
   }
 }
 
