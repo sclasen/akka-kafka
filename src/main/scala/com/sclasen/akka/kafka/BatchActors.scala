@@ -174,7 +174,7 @@ class BatchConnectorFSM[Key, Msg, Out:ClassTag, BatchOut](props: AkkaBatchConsum
   def sendBatch() = {
     val toSend = batch
     batch =  new collection.mutable.ArrayBuffer[Out](props.batchSize)
-    props.receiver ! batchHandler(batch)
+    props.receiver ! batchHandler(toSend)
   }
 
   def debugRec(msg:AnyRef, batch:Int, out:Int) = log.debug("state={} msg={} batch={} out={}", Receiving, msg,  batch, out)

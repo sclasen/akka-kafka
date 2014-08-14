@@ -57,7 +57,7 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
         sendMessages(topic)
 
         val batch = expectMsgPF(){
-          case s:SpecificallyTypedBatch  => s
+          case s:SpecificallyTypedBatch if s.msgs.size > 0  => s
         }
 
     }
@@ -72,7 +72,7 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
     (1 to 10).foreach {
       cycle =>
         val batch = expectMsgPF(){
-          case s:SpecificallyTypedBatch  => s
+          case s:SpecificallyTypedBatch if s.msgs.size > 0  => s
         }
 
     }
