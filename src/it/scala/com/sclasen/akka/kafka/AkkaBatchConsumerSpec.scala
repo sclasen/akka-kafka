@@ -137,7 +137,6 @@ object AkkaBatchConsumerSpec {
 class TestBatchReciever(testActor: ActorRef) extends Actor {
   override def receive = {
     case s: SpecificallyTypedBatch =>
-      println("==================>GOT SpecificallyTypedBatch")
       sender ! BatchProcessed
       testActor ! s
   }
