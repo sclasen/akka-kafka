@@ -14,7 +14,9 @@ object BatchConnectorFSM {
 
   sealed trait BatchConnectorState
 
-  case object Committing extends BatchConnectorState
+  case object WaitingToSendBatch extends BatchConnectorState
+
+  case object WaitingToReceiveBatchProcessed extends BatchConnectorState
 
   case object Receiving extends BatchConnectorState
 
@@ -114,7 +116,7 @@ class BatchConnectorFSM[Key, Msg, Out:ClassTag, BatchOut](props: AkkaBatchConsum
     case Event(Received(b:Out), outstanding) =>
       batch += b
       debugRec(Received, batch.size, outstanding)
-      goto(Committing) using outstanding - 1
+      goto(WaitingToSendBatch) using outstanding - 1
     case Event(StateTimeout, outstanding) if batch.size == 0 =>
       debugRec(StateTimeout, 0, outstanding)
       log.debug("at=nothing-to-commit outstanding={} batch-size={}", outstanding, batch.size)
@@ -123,27 +125,31 @@ class BatchConnectorFSM[Key, Msg, Out:ClassTag, BatchOut](props: AkkaBatchConsum
     case Event(StateTimeout, outstanding) =>
       debugRec(StateTimeout, 0, outstanding)
       log.info("at=recieve-timeout outstanding={} batch-size={}", outstanding, batch.size)
-      goto(Committing)
+      goto(WaitingToSendBatch)
   }
 
-  when(Committing, stateTimeout = 1 seconds) {
+  when(WaitingToSendBatch, stateTimeout = 1 seconds) {
     case Event(SendBatch, 0) =>
-      sendBatchAndStay()
-    case Event(StateTimeout, outstanding) if outstanding == 0 =>
-      sendBatchAndStay()
+      sendBatch()
     case Event(StateTimeout, outstanding) =>
-      log.warning("state={} msg={} outstanding={} streams={}", Committing, StateTimeout, outstanding, streams)
+      log.warning("state={} msg={} outstanding={} streams={}", WaitingToSendBatch, StateTimeout, outstanding, streams)
       stay()
     case Event(StreamUnused, outstanding) if outstanding == 1 =>
-      sendBatchAndStay()
+      sendBatch()
     case Event(StreamUnused, outstanding) =>
       stay using outstanding - 1
     case Event(Received(b:Out), outstanding) if outstanding == 1 =>
       batch += b
-      sendBatchAndStay()
+      sendBatch()
     case Event(Received(b:Out), outstanding) =>
       batch += b
       stay using outstanding -1
+  }
+
+  when(WaitingToReceiveBatchProcessed, stateTimeout = 1 seconds){
+    case Event(StateTimeout, outstanding) =>
+      log.warning("state={} msg={}  streams={}", WaitingToReceiveBatchProcessed, StateTimeout, streams)
+      stay()
     case Event(BatchProcessed, _) =>
       connector.commitOffsets
       batch.clear()
@@ -161,25 +167,20 @@ class BatchConnectorFSM[Key, Msg, Out:ClassTag, BatchOut](props: AkkaBatchConsum
 
   onTransition{
     //when we transistion fron Receiving to Committing with 0 outstanding, immeduately send batch
-    case Receiving -> Committing if nextStateData == 0 => self ! SendBatch
+    case Receiving -> WaitingToSendBatch if nextStateData == 0 => self ! SendBatch
   }
 
-  def sendBatchAndStay() = {
-    log.info("at=drain-finised")
-    sendBatch()
-    log.info("at=committed-offsets")
-    stay using 0
-  }
 
   def sendBatch() = {
     val toSend = batch
     batch =  new collection.mutable.ArrayBuffer[Out](props.batchSize)
     props.receiver ! batchHandler(toSend)
+    goto(WaitingToReceiveBatchProcessed) using 0
   }
 
   def debugRec(msg:AnyRef, batch:Int, out:Int) = log.debug("state={} msg={} batch={} out={}", Receiving, msg,  batch, out)
 
-  def debugCommit(msg:AnyRef, stream:String, drained:Int) = log.debug("state={} msg={} drained={}", Committing, msg,  drained)
+  def debugCommit(msg:AnyRef, stream:String, drained:Int) = log.debug("state={} msg={} drained={}", WaitingToSendBatch, msg,  drained)
 
 }
 
