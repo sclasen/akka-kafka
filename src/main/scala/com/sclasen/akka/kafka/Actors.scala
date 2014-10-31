@@ -170,7 +170,7 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
     case Event(d@Drained(stream), drained) if drained + 1 == context.children.size =>
       debugCommit(d, stream, drained + 1)
       log.info("at=drain-finised")
-      connector.commitOffsets
+      connector.commitOffsets(true)
       log.info("at=committed-offsets")
       goto(Receiving) using 0
   }

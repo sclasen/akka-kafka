@@ -151,7 +151,7 @@ class BatchConnectorFSM[Key, Msg, Out:ClassTag, BatchOut](props: AkkaBatchConsum
       log.warning("state={} msg={}  streams={}", WaitingToReceiveBatchProcessed, StateTimeout, streams)
       stay()
     case Event(BatchProcessed, _) =>
-      connector.commitOffsets
+      connector.commitOffsets(true)
       batch.clear()
       context.children.foreach(_ ! Continue)
       goto(Receiving) using context.children.size
