@@ -6,6 +6,8 @@ version := "0.0.9-0.8.2-beta-SNAPSHOT"
 
 scalaVersion := "2.10.4"
 
+crossScalaVersions := Seq("2.10.4", "2.11.4")
+
 parallelExecution in Test := false
 
 //resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
@@ -21,7 +23,7 @@ libraryDependencies +=   "org.apache.kafka" %% "kafka"  %"0.8.2-beta" exclude("l
 
 libraryDependencies += "com.typesafe.akka" %% "akka-testkit" % "2.3.6" % "test,it"
 
-libraryDependencies += "org.scalatest" %% "scalatest" % "2.0" % "test,it"
+libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.2" % "test,it"
 
 libraryDependencies += "commons-io" % "commons-io" % "2.4" % "test,it"
 
