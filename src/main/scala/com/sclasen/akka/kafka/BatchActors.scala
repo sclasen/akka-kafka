@@ -98,7 +98,6 @@ class BatchConnectorFSM[Key, Msg, Out:ClassTag, BatchOut](props: AkkaBatchConsum
       topicFilterOrTopic.fold(startTopicFilter, startTopic)
 
       log.info("at=created-streams")
-      context.children.foreach(println)
       context.children.foreach(_ ! Continue)
       sender ! Started
       goto(Receiving) using context.children.size

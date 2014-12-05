@@ -114,7 +114,6 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
       topicFilterOrTopic.fold(startTopicFilter, startTopic)
 
       log.info("at=created-streams")
-      context.children.foreach(println)
       context.children.foreach(_ ! Continue)
       scheduleCommit
       sender ! Started
@@ -169,7 +168,7 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
       stay using (drained + 1)
     case Event(d@Drained(stream), drained) if drained + 1 == context.children.size =>
       debugCommit(d, stream, drained + 1)
-      log.info("at=drain-finised")
+      log.info("at=drain-finished")
       connector.commitOffsets
       log.info("at=committed-offsets")
       goto(Receiving) using 0
