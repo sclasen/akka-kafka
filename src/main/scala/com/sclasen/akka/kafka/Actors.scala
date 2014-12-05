@@ -114,7 +114,6 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
       topicFilterOrTopic.fold(startTopicFilter, startTopic)
 
       log.info("at=created-streams")
-      context.children.foreach(println)
       context.children.foreach(_ ! Continue)
       scheduleCommit
       sender ! Started
