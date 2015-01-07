@@ -44,8 +44,8 @@ class AkkaConsumer[Key,Msg](props:AkkaConsumerProps[Key,Msg]) {
     val consumerConfig = new ConsumerConfig(kafkaConsumerProps(zkConnect, group))
     val consumerConnector = Consumer.create(consumerConfig)
     props.connectorActorName.map{
-      name =>  system.actorOf(Props(new ConnectorFSM(props, consumerConnector)), name)
-    }.getOrElse(system.actorOf(Props(new ConnectorFSM(props, consumerConnector))))
+      name =>  actorRefFactory.actorOf(Props(new ConnectorFSM(props, consumerConnector)), name)
+    }.getOrElse(actorRefFactory.actorOf(Props(new ConnectorFSM(props, consumerConnector))))
   }
 
   def start():Future[Unit] = {

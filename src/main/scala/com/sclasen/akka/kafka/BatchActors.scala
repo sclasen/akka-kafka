@@ -70,7 +70,7 @@ class BatchConnectorFSM[Key, Msg, Out:ClassTag, BatchOut](props: AkkaBatchConsum
 
   when(Stopped) {
     case Event(Start, _) =>
-      val listener = context.system.actorOf(Props(new Actor {
+      val listener = context.actorOf(Props(new Actor {
         def receive = {
           case d: DeadLetter ⇒ log.error(d.toString())
           case a: ActorRef => context.watch(a)
