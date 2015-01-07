@@ -2,7 +2,7 @@ organization := "com.sclasen"
 
 name := "akka-kafka"
 
-version := "0.0.9-SNAPSHOT"
+version := "0.0.9"
 
 scalaVersion := "2.10.4"
 
