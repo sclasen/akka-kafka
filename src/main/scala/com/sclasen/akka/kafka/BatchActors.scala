@@ -70,28 +70,17 @@ class BatchConnectorFSM[Key, Msg, Out:ClassTag, BatchOut](props: AkkaBatchConsum
 
   when(Stopped) {
     case Event(Start, _) =>
-      val listener = context.actorOf(Props(new Actor {
-        def receive = {
-          case d: DeadLetter ⇒ log.error(d.toString())
-          case a: ActorRef => context.watch(a)
-          case t: Terminated => log.error("TERMINATED! {}", t)
-        }
-      }))
-      context.system.eventStream.subscribe(listener, classOf[DeadLetter])
-
       log.info("at=start")
       def startTopic(topic:String){
         connector.createMessageStreams(Map(topic -> streams), props.keyDecoder, props.msgDecoder).apply(topic).zipWithIndex.foreach {
           case (stream, index) =>
-            val streamActor = context.actorOf(Props(new BatchStreamFSM(stream, self, props.msgHandler)), s"stream${index}")
-            listener ! streamActor
+            context.actorOf(Props(new BatchStreamFSM(stream, self, props.msgHandler)), s"stream${index}")
         }
       }
       def startTopicFilter(topicFilter:TopicFilter){
         connector.createMessageStreamsByFilter(topicFilter, streams, props.keyDecoder, props.msgDecoder).zipWithIndex.foreach {
           case (stream, index) =>
-            val streamActor = context.actorOf(Props(new BatchStreamFSM(stream, self, props.msgHandler)), s"stream${index}")
-            listener ! streamActor
+            context.actorOf(Props(new BatchStreamFSM(stream, self, props.msgHandler)), s"stream${index}")
         }
       }
 
