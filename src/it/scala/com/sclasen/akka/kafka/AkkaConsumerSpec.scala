@@ -131,7 +131,7 @@ object AkkaConsumerSpec {
 
 }
 
-class TestReciever(testActor: ActorRef) extends Actor {
+class TestReceiver(testActor: ActorRef) extends Actor {
   override def receive = {
     case m: Any =>
       sender ! Processed
