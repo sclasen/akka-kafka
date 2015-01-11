@@ -86,8 +86,9 @@ object AkkaConsumerProps {
                       connectorActorName:Option[String] = None,
                       maxInFlightPerStream: Int = 64,
                       startTimeout: Timeout = Timeout(5 seconds),
-                      commitConfig: CommitConfig = CommitConfig()): AkkaConsumerProps[Key, Msg] =
-    AkkaConsumerProps(system, system, zkConnect, Right(topic), group, streams, keyDecoder, msgDecoder, msgHandler, receiver, connectorActorName, maxInFlightPerStream, startTimeout, commitConfig)
+                      commitConfig: CommitConfig = CommitConfig(),
+                      unusedTimeout: FiniteDuration= 5 seconds): AkkaConsumerProps[Key, Msg] =
+    AkkaConsumerProps(system, system, zkConnect, Right(topic), group, streams, keyDecoder, msgDecoder, msgHandler, receiver, connectorActorName, maxInFlightPerStream, startTimeout, commitConfig, unusedTimeout)
 
   def forSystemWithFilter[Key, Msg](system: ActorSystem,
                           zkConnect: String,
@@ -101,8 +102,9 @@ object AkkaConsumerProps {
                           connectorActorName:Option[String] = None,
                           maxInFlightPerStream: Int = 64,
                           startTimeout: Timeout = Timeout(5 seconds),
-                          commitConfig: CommitConfig = CommitConfig()): AkkaConsumerProps[Key, Msg] =
-    AkkaConsumerProps(system, system, zkConnect, Left(topicFilter), group, streams, keyDecoder, msgDecoder, msgHandler, receiver, connectorActorName, maxInFlightPerStream, startTimeout, commitConfig)
+                          commitConfig: CommitConfig = CommitConfig(),
+                          unusedTimeout: FiniteDuration= 5 seconds): AkkaConsumerProps[Key, Msg] =
+    AkkaConsumerProps(system, system, zkConnect, Left(topicFilter), group, streams, keyDecoder, msgDecoder, msgHandler, receiver, connectorActorName, maxInFlightPerStream, startTimeout, commitConfig,unusedTimeout)
 
 
   def forContext[Key, Msg](context: ActorContext,
@@ -117,8 +119,9 @@ object AkkaConsumerProps {
                       connectorActorName:Option[String] = None,
                       maxInFlightPerStream: Int = 64,
                       startTimeout: Timeout = Timeout(5 seconds),
-                      commitConfig: CommitConfig): AkkaConsumerProps[Key, Msg] =
-    AkkaConsumerProps(context.system, context, zkConnect, Right(topic), group, streams, keyDecoder, msgDecoder, msgHandler, receiver,connectorActorName, maxInFlightPerStream, startTimeout, commitConfig)
+                      commitConfig: CommitConfig,
+                      unusedTimeout: FiniteDuration= 5 seconds): AkkaConsumerProps[Key, Msg] =
+    AkkaConsumerProps(context.system, context, zkConnect, Right(topic), group, streams, keyDecoder, msgDecoder, msgHandler, receiver,connectorActorName, maxInFlightPerStream, startTimeout, commitConfig, unusedTimeout)
 
   def forContextWithFilter[Key, Msg](context: ActorContext,
                            zkConnect: String,
@@ -132,8 +135,9 @@ object AkkaConsumerProps {
                            connectorActorName:Option[String] = None,
                            maxInFlightPerStream: Int = 64,
                            startTimeout: Timeout = Timeout(5 seconds),
-                           commitConfig: CommitConfig): AkkaConsumerProps[Key, Msg] =
-    AkkaConsumerProps(context.system, context, zkConnect, Left(topicFilter), group, streams, keyDecoder, msgDecoder, msgHandler, receiver,connectorActorName, maxInFlightPerStream, startTimeout, commitConfig)
+                           commitConfig: CommitConfig,
+                           unusedTimeout: FiniteDuration = 5 seconds): AkkaConsumerProps[Key, Msg] =
+    AkkaConsumerProps(context.system, context, zkConnect, Left(topicFilter), group, streams, keyDecoder, msgDecoder, msgHandler, receiver,connectorActorName, maxInFlightPerStream, startTimeout, commitConfig, unusedTimeout)
 
   def defaultHandler[Key,Msg]: (MessageAndMetadata[Key,Msg]) => Any = msg => msg.message()
 }
@@ -151,7 +155,8 @@ case class AkkaConsumerProps[Key,Msg](system:ActorSystem,
                                       connectorActorName:Option[String],
                                       maxInFlightPerStream:Int = 64,
                                       startTimeout:Timeout = Timeout(5 seconds),
-                                      commitConfig:CommitConfig = CommitConfig())
+                                      commitConfig:CommitConfig = CommitConfig(),
+                                      unusedTimeout: FiniteDuration= 5 seconds)
 
 case class CommitConfig(commitInterval:Option[FiniteDuration] = Some(10 seconds),
                         commitAfterMsgCount:Option[Int] = Some(10000),
