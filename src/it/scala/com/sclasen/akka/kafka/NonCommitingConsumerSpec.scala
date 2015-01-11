@@ -23,18 +23,57 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
 
   val producer = kafkaProducer
 
-  val messages = 10000
+  val messages = 1000
 
   import system.dispatcher
 
 
+
   "AkkaConsumer with Non Committing config" should {
     "work with a topic" in {
-      val receiver = system.actorOf(Props(new TestReciever(testActor)))
+      val receiver = system.actorOf(Props(new TestReceiver(testActor)))
       val consumer = new AkkaConsumer(testProps(system, singleTopic, receiver))
       doTest(singleTopic, consumer)
       consumer.stop() pipeTo testActor
       expectMsg(())
+    }
+  }
+
+  "AkkaConsumer when on Unused" should {
+    "retry after some especific time" in {
+
+      val receiver = system.actorOf(Props(new TestReceiver(testActor)))
+
+      val testProps = AkkaConsumerProps.forSystem(
+        system = system,
+        connectorActorName = Some("testFSM"),
+        zkConnect = "localhost:2181",
+        topic = singleTopic,
+        group = "consumer-spec",
+        streams = 1,
+        keyDecoder = new DefaultDecoder(),
+        msgDecoder = new DefaultDecoder(),
+        receiver = receiver,
+        maxInFlightPerStream = 1,
+        commitConfig = CommitConfig(None, None)
+      )
+
+      val consumer = new AkkaConsumer(testProps)
+
+      consumer.start().map {
+        _ => testActor ! ConnectorFSM.Started
+      }
+
+      expectMsg(2 seconds, ConnectorFSM.Started)
+      //It seems that the first message is not read from kafka, maybe because it is creating a new topic
+      producer.send(new KeyedMessage(singleTopic, "KEY".getBytes, "MESSAGE".getBytes))
+      //if I do not wait for some time, this messages will never be read
+      Thread.sleep(1000)
+      sendMessages(singleTopic)
+      Thread.sleep(1000)
+      sendMessages(singleTopic)
+      receiveN(messages * 2, 5 seconds)
+
     }
   }
 
@@ -48,7 +87,6 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
 
     producer.send(new KeyedMessage(topic, 0.toString.getBytes, 0.toString.getBytes))
     receiveOne(2 seconds)
-
 
     (1 to 10).foreach {
       cycle =>
