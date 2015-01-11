@@ -29,6 +29,8 @@ libraryDependencies += "org.slf4j" % "log4j-over-slf4j" % "1.6.6" % "provided"
 
 parallelExecution in Test := false
 
+fork := true
+
 pomExtra := (
   <url>http://github.com/sclasen/akka-kafka</url>
     <licenses>
