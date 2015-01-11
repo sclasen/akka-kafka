@@ -90,13 +90,13 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
       def startTopic(topic:String){
         connector.createMessageStreams(Map(topic -> streams), props.keyDecoder, props.msgDecoder).apply(topic).zipWithIndex.foreach {
           case (stream, index) =>
-            context.actorOf(Props(new StreamFSM(stream, maxInFlightPerStream, receiver, msgHandler)), s"stream${index}")
+            context.actorOf(Props(new StreamFSM(stream, maxInFlightPerStream, receiver, msgHandler, unusedTimeout)), s"stream${index}")
         }
       }
       def startTopicFilter(topicFilter:TopicFilter){
         connector.createMessageStreamsByFilter(topicFilter, streams, props.keyDecoder, props.msgDecoder).zipWithIndex.foreach {
           case (stream, index) =>
-            context.actorOf(Props(new StreamFSM(stream, maxInFlightPerStream, receiver, msgHandler)), s"stream${index}")
+            context.actorOf(Props(new StreamFSM(stream, maxInFlightPerStream, receiver, msgHandler, unusedTimeout)), s"stream${index}")
         }
       }
 
@@ -177,7 +177,7 @@ class ConnectorFSM[Key, Msg](props: AkkaConsumerProps[Key, Msg], connector: Cons
 
 }
 
-class StreamFSM[Key, Msg](stream: KafkaStream[Key, Msg], maxOutstanding: Int, receiver: ActorRef, msgHandler: (MessageAndMetadata[Key,Msg]) => Any) extends Actor with FSM[StreamState, Int] {
+class StreamFSM[Key, Msg](stream: KafkaStream[Key, Msg], maxOutstanding: Int, receiver: ActorRef, msgHandler: (MessageAndMetadata[Key,Msg]) => Any, unusedTimeout: FiniteDuration) extends Actor with FSM[StreamState, Int] {
 
   lazy val msgIterator = stream.iterator()
   val conn = context.parent
@@ -293,14 +293,22 @@ class StreamFSM[Key, Msg](stream: KafkaStream[Key, Msg], maxOutstanding: Int, re
       stay()
   }
 
-  /* we think this stream wont get messages */
-  when(Unused) {
+  /* we think this stream might not get any more messages but you can configure a timeout
+   * so it can ask for the next message on the kafka iterator */
+  when(Unused, stateTimeout = unusedTimeout) {
     case Event(Drain, outstanding) =>
       debug(Unused, Drain, outstanding)
       goto(Empty)
     case Event(Continue, outstanding) =>
       debug(Unused, Continue, outstanding)
       goto(Processing)
+    case Event(StateTimeout, outstanding) =>
+      debug(Unused, Continue, outstanding)
+      self ! Continue
+      goto(Processing) using outstanding
+
+
+
   }
 
   whenUnhandled{
