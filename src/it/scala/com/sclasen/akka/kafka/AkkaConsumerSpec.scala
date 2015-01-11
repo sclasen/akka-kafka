@@ -32,7 +32,7 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
 
   "AkkaConsumer" should {
     "work with a topic" in {
-      val receiver = system.actorOf(Props(new TestReciever(testActor)))
+      val receiver = system.actorOf(Props(new TestReceiver(testActor)))
       val consumer = new AkkaConsumer(testProps(system, singleTopic, receiver))
       doTest(singleTopic, consumer)
       consumer.stop() pipeTo testActor
@@ -42,7 +42,7 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
 
   "AkkaConsumer with TopicFilter" should {
     "work with a topicFilter" in {
-      val receiver = system.actorOf(Props(new TestReciever(testActor)))
+      val receiver = system.actorOf(Props(new TestReceiver(testActor)))
       val consumer = new AkkaConsumer(testProps(system, new Blacklist("^test.*"), receiver))
       doTest(topicFilter, consumer)
       consumer.stop() pipeTo testActor
@@ -137,5 +137,6 @@ class TestReceiver(testActor: ActorRef) extends Actor {
       sender ! Processed
       testActor ! m
   }
+}
 }
 
