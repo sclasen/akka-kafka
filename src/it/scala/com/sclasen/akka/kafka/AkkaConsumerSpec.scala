@@ -137,6 +137,6 @@ class TestReceiver(testActor: ActorRef) extends Actor {
       sender ! Processed
       testActor ! m
   }
-}
+
 }
 
