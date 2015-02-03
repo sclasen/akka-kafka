@@ -2,9 +2,11 @@ organization := "com.sclasen"
 
 name := "akka-kafka"
 
-version := "0.0.11-SNAPSHOT"
+version := "0.0.11-kafka-0.8.2.0-SNAPSHOT"
 
-scalaVersion := "2.10.4"
+scalaVersion := "2.11.5"
+
+crossScalaVersions := Seq("2.11.5", "2.10.4")
 
 parallelExecution in Test := false
 
@@ -13,19 +15,19 @@ parallelExecution in Test := false
 resolvers += "spray repo" at "http://repo.spray.io"
 
 
-libraryDependencies += "com.typesafe.akka" %% "akka-actor" % "2.3.2" % "compile"
+libraryDependencies += "com.typesafe.akka" %% "akka-actor" % "2.3.9" % "compile"
 
-libraryDependencies += "com.typesafe.akka" %% "akka-slf4j" % "2.3.2" % "test,it"
+libraryDependencies += "com.typesafe.akka" %% "akka-slf4j" % "2.3.9" % "test,it"
 
-libraryDependencies +=   "org.apache.kafka" %% "kafka"  %"0.8.1" exclude("log4j", "log4j") exclude("org.slf4j","slf4j-log4j12")
+libraryDependencies +=   "org.apache.kafka" %% "kafka"  % "0.8.2.0" exclude("log4j", "log4j") exclude("org.slf4j","slf4j-log4j12")
 
-libraryDependencies += "com.typesafe.akka" %% "akka-testkit" % "2.3.2" % "test,it"
+libraryDependencies += "com.typesafe.akka" %% "akka-testkit" % "2.3.9" % "test,it"
 
-libraryDependencies += "org.scalatest" %% "scalatest" % "2.0" % "test,it"
+libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.1" % "test,it"
 
 libraryDependencies += "commons-io" % "commons-io" % "2.4" % "test,it"
 
-libraryDependencies += "org.slf4j" % "log4j-over-slf4j" % "1.6.6" % "provided"
+libraryDependencies += "org.slf4j" % "log4j-over-slf4j" % "1.7.10" % "provided"
 
 parallelExecution in Test := false
 
