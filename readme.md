@@ -4,6 +4,8 @@ akka-kafka
 
 Actor based kafka consumer built on top of the high level kafka consumer.
 
+The `0.0.X` versions of akka-kafka were built with kafka `0.8.1.1`. Starting with `0.1.0` akka-kafka is built against the scala 2.11 version of kafka `0.8.2.0`
+
 AkkaConsumer
 ------------
 
@@ -30,11 +32,11 @@ If you dont want to use slf4j, you can substitute log4j.
 ```scala
 /* build.sbt */
 
-libraryDependencies += "com.sclasen" %% "akka-kafka" % "0.0.10" % "compile"
+libraryDependencies += "com.sclasen" %% "akka-kafka" % "0.1.0" % "compile"
 
-libraryDependencies += "com.typesafe.akka" %% "akka-slf4j" % "2.3.2" % "compile"
+libraryDependencies += "com.typesafe.akka" %% "akka-slf4j" % "2.3.9" % "compile"
 
-libraryDependencies += "org.slf4j" % "log4j-over-slf4j" % "1.6.6" % "compile"
+libraryDependencies += "org.slf4j" % "log4j-over-slf4j" % "1.7.10" % "compile"
 ```
 
 AkkaConsumer
