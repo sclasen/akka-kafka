@@ -6,14 +6,12 @@ import concurrent.duration._
 import kafka.producer.{KeyedMessage, ProducerConfig, Producer}
 import kafka.serializer.DefaultDecoder
 
-import StreamFSM._
 import AkkaBatchConsumerSpec._
 
 import org.scalatest._
-import kafka.consumer.{Blacklist, Whitelist, TopicFilter}
 import akka.pattern._
 import kafka.message.MessageAndMetadata
-import com.sclasen.akka.kafka.BatchConnectorFSM.{Batch, BatchProcessed}
+import com.sclasen.akka.kafka.BatchConnectorFSM.{BatchProcessed}
 
 
 class AkkaBatchConsumerSpec(_system: ActorSystem) extends TestKit(_system) with ImplicitSender

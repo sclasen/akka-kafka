@@ -3,8 +3,6 @@ package com.sclasen.akka.kafka
 import akka.actor._
 import concurrent.duration._
 import kafka.consumer._
-import akka.actor.DeadLetter
-import akka.actor.Terminated
 import kafka.message.MessageAndMetadata
 import com.sclasen.akka.kafka.BatchConnectorFSM._
 import com.sclasen.akka.kafka.BatchStreamFSM._
