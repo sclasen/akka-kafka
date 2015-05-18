@@ -1,0 +1,14 @@
+language: scala
+
+sudo: false
+
+script:
+  - wget https://godist.herokuapp.com/projects/ddollar/forego/releases/current/linux-amd64/forego
+  - chmod +x forego
+  - ./bin/setup
+  - cp .env.sample .env
+  - ./forego start &
+  - sbt "it:test"
+
+env:
+  - LOG_LEVEL=INFO
