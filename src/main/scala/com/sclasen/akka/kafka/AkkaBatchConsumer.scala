@@ -6,7 +6,6 @@ import akka.util.Timeout
 import collection.JavaConverters._
 import concurrent.Future
 import concurrent.duration._
-import java.util.Properties
 import kafka.consumer.{TopicFilter, ConsumerConfig, Consumer}
 import kafka.serializer.Decoder
 import kafka.message.MessageAndMetadata

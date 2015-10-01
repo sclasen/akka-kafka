@@ -6,10 +6,6 @@ import kafka.consumer._
 
 import com.sclasen.akka.kafka.ConnectorFSM._
 import StreamFSM._
-import scala.Some
-import com.sclasen.akka.kafka.ConnectorFSM.Drained
-import akka.actor.DeadLetter
-import akka.actor.Terminated
 import kafka.message.MessageAndMetadata
 
 object ConnectorFSM {

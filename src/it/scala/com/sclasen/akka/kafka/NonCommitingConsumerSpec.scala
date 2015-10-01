@@ -1,16 +1,14 @@
 package com.sclasen.akka.kafka
 
-import akka.actor.{Props, Actor, ActorRef, ActorSystem}
+import akka.actor.{Props, ActorRef, ActorSystem}
 import akka.testkit.{TestKit, ImplicitSender}
 import concurrent.duration._
 import kafka.producer.{KeyedMessage, ProducerConfig, Producer}
 import kafka.serializer.DefaultDecoder
 
-import StreamFSM._
 import AkkaConsumerSpec._
 
 import org.scalatest._
-import kafka.consumer.{Blacklist, Whitelist, TopicFilter}
 import akka.pattern._
 
 

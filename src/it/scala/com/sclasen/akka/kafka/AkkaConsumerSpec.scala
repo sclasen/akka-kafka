@@ -10,7 +10,7 @@ import StreamFSM._
 import AkkaConsumerSpec._
 
 import org.scalatest._
-import kafka.consumer.{Blacklist, Whitelist, TopicFilter}
+import kafka.consumer.{Blacklist, TopicFilter}
 import akka.pattern._
 
 
