@@ -2,6 +2,8 @@
 akka-kafka
 ==========
 
+[![Build Status](https://travis-ci.org/sclasen/akka-kafka.svg?branch=master)](https://travis-ci.org/sclasen/akka-kafka)
+
 Actor based kafka consumer built on top of the high level kafka consumer.
 
 The `0.0.X` versions of akka-kafka were built with kafka `0.8.1.1`. Starting with `0.1.0` akka-kafka is built against the scala 2.11 version of kafka `0.8.2.0`
