@@ -2,7 +2,7 @@ resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/release
 
 addSbtPlugin("com.typesafe.sbt" % "sbt-scalariform" % "1.2.1")
 
-addSbtPlugin("com.typesafe.sbt" % "sbt-pgp" % "0.8.1")
+//addSbtPlugin("com.typesafe.sbt" % "sbt-pgp" % "0.8.1")
 
 resolvers += "sbt-idea-repo" at "http://mpeltonen.github.com/maven/"
 
