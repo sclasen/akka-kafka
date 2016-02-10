@@ -233,7 +233,7 @@ import kafka.serializer.DefaultDecoder
 ```
 
 
-AkkaHighLevelConsumer
+AkkaDirectConsumer
 -----------------
 
 This consumer is based on [Kafka High Level Consumer](https://cwiki.apache.org/confluence/display/KAFKA/Consumer+Group+Example).  This consumer creates `N` threads per topic where `N` = `streams`.  Each thread will block on the iterator until a message becomes available.  Messages are then forwarded to your receiving actor in the same manor.
@@ -249,15 +249,15 @@ This will not affect the configured values for other actors [AkkaBatchConsumer, 
 This consumer is suitable for low volume messages that require minimal latency (eg: Instant Messaging applications)
 
 Some notes on blocking:
-* (http://doc.akka.io/docs/akka/2.2.3/general/actor-systems.html#Blocking_Needs_Careful_Management)[Blocking Needs Careful Management]
+* [Blocking Needs Careful Management](http://doc.akka.io/docs/akka/2.2.3/general/actor-systems.html#Blocking_Needs_Careful_Management)
 
-`AkkaHighLevelConsumerProps` has similar convenience methods to `AkkaConsumerProps`
+`AkkaDirectConsumerProps` has similar convenience methods to `AkkaConsumerProps`
 
 So a full example of getting a high level consumer up and running looks like this.
 
 ```scala
 import akka.actor.{Props, ActorSystem, Actor}
-import com.sclasen.akka.kafka.{AkkaHighLevelConsumer, AkkaHighLevelConsumerProps}
+import com.sclasen.akka.kafka.{AkkaDirectConsumer, AkkaDirectConsumerProps}
 import kafka.serializer.DefaultDecoder
 
 object Example {
@@ -275,7 +275,7 @@ object Example {
   /*
   the consumer will have 4 streams (threads that block per topic)
   */
-  val consumerProps = AkkaHighLevelConsumerProps.forSystem(
+  val consumerProps = AkkaDirectConsumerProps.forSystem(
     system = system,
     zkConnect = "localhost:2181",
     topic = "your-kafka-topic",

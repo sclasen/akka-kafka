@@ -1,28 +1,16 @@
 package com.sclasen.akka.kafka
 
-import java.util.concurrent.Executors
-
+import java.util.concurrent.{TimeUnit, Executors}
 import akka.actor._
 import akka.util.Timeout
 import collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 import concurrent.duration._
-import java.util.Properties
 import kafka.consumer._
 import kafka.serializer.Decoder
 import kafka.message.MessageAndMetadata
 
-object AkkaHighLevelConsumer{
-  def toProps(props:collection.mutable.Set[(String,String)]): Properties = {
-    props.foldLeft(new Properties()) {
-      case (p, (k, v)) =>
-        p.setProperty(k, v)
-        p
-    }
-  }
-}
-
-class AkkaHighLevelConsumer[Key,Msg](props:AkkaConsumerProps[Key,Msg]) {
+class AkkaDirectConsumer[Key,Msg](props:AkkaDirectConsumerProps[Key,Msg]) {
 
   import AkkaConsumer._
 
@@ -45,7 +33,7 @@ class AkkaHighLevelConsumer[Key,Msg](props:AkkaConsumerProps[Key,Msg]) {
     Consumer.create(new ConsumerConfig(kafkaConsumerProps(zkConnect, groupId)))
   }
 
-  def createConnection(props:AkkaConsumerProps[Key,Msg]) =  {
+  def createConnection(props:AkkaDirectConsumerProps[Key,Msg]) =  {
     import props._
     val consumerConfig = new ConsumerConfig(kafkaConsumerProps(zkConnect, group))
     Consumer.create(consumerConfig)
@@ -87,15 +75,19 @@ class AkkaHighLevelConsumer[Key,Msg](props:AkkaConsumerProps[Key,Msg]) {
   def stop():Future[Unit] = {
     connector.shutdown()
     ecForBlockingIterator.shutdown()
-    Future.successful(Unit)
-  }
-
-  def commit():Future[Unit] = {
+    try {
+      if (!ecForBlockingIterator.awaitTermination(5000, TimeUnit.MILLISECONDS)) {
+        props.system.log.warning("Timed out waiting for consumer threads to shut down, exiting uncleanly");
+      }
+    } catch {
+      case e:InterruptedException =>
+        props.system.log.warning("Interrupted during shutdown, exiting uncleanly");
+    }
     Future.successful(Unit)
   }
 }
 
-object AkkaHighLevelConsumerProps {
+object AkkaDirectConsumerProps {
   def forSystem[Key, Msg](system: ActorSystem,
                           zkConnect: String,
                           topic: String,
@@ -106,10 +98,8 @@ object AkkaHighLevelConsumerProps {
                           receiver: ActorRef,
                           msgHandler: (MessageAndMetadata[Key,Msg]) => Any = defaultHandler[Key, Msg],
                           connectorActorName:Option[String] = None,
-                          maxInFlightPerStream: Int = 64,
-                          startTimeout: Timeout = Timeout(5 seconds),
-                          commitConfig: CommitConfig = CommitConfig()): AkkaConsumerProps[Key, Msg] =
-    AkkaConsumerProps(system, system, zkConnect, Right(topic), group, streams, keyDecoder, msgDecoder, msgHandler, receiver, connectorActorName, maxInFlightPerStream, startTimeout, commitConfig)
+                          startTimeout: Timeout = Timeout(5 seconds)): AkkaDirectConsumerProps[Key, Msg] =
+    AkkaDirectConsumerProps(system, system, zkConnect, Right(topic), group, streams, keyDecoder, msgDecoder, msgHandler, receiver, connectorActorName, startTimeout)
 
   def forSystemWithFilter[Key, Msg](system: ActorSystem,
                                     zkConnect: String,
@@ -121,10 +111,8 @@ object AkkaHighLevelConsumerProps {
                                     receiver: ActorRef,
                                     msgHandler: (MessageAndMetadata[Key,Msg]) => Any = defaultHandler[Key, Msg],
                                     connectorActorName:Option[String] = None,
-                                    maxInFlightPerStream: Int = 64,
-                                    startTimeout: Timeout = Timeout(5 seconds),
-                                    commitConfig: CommitConfig = CommitConfig()): AkkaConsumerProps[Key, Msg] =
-    AkkaConsumerProps(system, system, zkConnect, Left(topicFilter), group, streams, keyDecoder, msgDecoder, msgHandler, receiver, connectorActorName, maxInFlightPerStream, startTimeout, commitConfig)
+                                    startTimeout: Timeout = Timeout(5 seconds)): AkkaDirectConsumerProps[Key, Msg] =
+    AkkaDirectConsumerProps(system, system, zkConnect, Left(topicFilter), group, streams, keyDecoder, msgDecoder, msgHandler, receiver, connectorActorName, startTimeout)
 
 
   def forContext[Key, Msg](context: ActorContext,
@@ -137,10 +125,8 @@ object AkkaHighLevelConsumerProps {
                            receiver: ActorRef,
                            msgHandler: (MessageAndMetadata[Key,Msg]) => Any = defaultHandler[Key, Msg],
                            connectorActorName:Option[String] = None,
-                           maxInFlightPerStream: Int = 64,
-                           startTimeout: Timeout = Timeout(5 seconds),
-                           commitConfig: CommitConfig): AkkaConsumerProps[Key, Msg] =
-    AkkaConsumerProps(context.system, context, zkConnect, Right(topic), group, streams, keyDecoder, msgDecoder, msgHandler, receiver,connectorActorName, maxInFlightPerStream, startTimeout, commitConfig)
+                           startTimeout: Timeout = Timeout(5 seconds)): AkkaDirectConsumerProps[Key, Msg] =
+    AkkaDirectConsumerProps(context.system, context, zkConnect, Right(topic), group, streams, keyDecoder, msgDecoder, msgHandler, receiver,connectorActorName, startTimeout)
 
   def forContextWithFilter[Key, Msg](context: ActorContext,
                                      zkConnect: String,
@@ -152,15 +138,13 @@ object AkkaHighLevelConsumerProps {
                                      receiver: ActorRef,
                                      msgHandler: (MessageAndMetadata[Key,Msg]) => Any = defaultHandler[Key, Msg],
                                      connectorActorName:Option[String] = None,
-                                     maxInFlightPerStream: Int = 64,
-                                     startTimeout: Timeout = Timeout(5 seconds),
-                                     commitConfig: CommitConfig): AkkaConsumerProps[Key, Msg] =
-    AkkaConsumerProps(context.system, context, zkConnect, Left(topicFilter), group, streams, keyDecoder, msgDecoder, msgHandler, receiver,connectorActorName, maxInFlightPerStream, startTimeout, commitConfig)
+                                     startTimeout: Timeout = Timeout(5 seconds)): AkkaDirectConsumerProps[Key, Msg] =
+    AkkaDirectConsumerProps(context.system, context, zkConnect, Left(topicFilter), group, streams, keyDecoder, msgDecoder, msgHandler, receiver,connectorActorName, startTimeout)
 
   def defaultHandler[Key,Msg]: (MessageAndMetadata[Key,Msg]) => Any = msg => msg.message()
 }
 
-case class AkkaHighLevelConsumerProps[Key,Msg](system:ActorSystem,
+case class AkkaDirectConsumerProps[Key,Msg](system:ActorSystem,
                                                actorRefFactory:ActorRefFactory,
                                                zkConnect:String,
                                                topicFilterOrTopic:Either[TopicFilter,String],
@@ -171,7 +155,4 @@ case class AkkaHighLevelConsumerProps[Key,Msg](system:ActorSystem,
                                                msgHandler: (MessageAndMetadata[Key,Msg]) => Any,
                                                receiver: ActorRef,
                                                connectorActorName:Option[String],
-                                               maxInFlightPerStream:Int = 64,
-                                               startTimeout:Timeout = Timeout(5 seconds),
-                                               commitConfig:CommitConfig = CommitConfig())
-
+                                               startTimeout:Timeout = Timeout(5 seconds))
