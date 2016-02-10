@@ -232,6 +232,69 @@ import kafka.serializer.DefaultDecoder
 }
 ```
 
+
+AkkaHighLevelConsumer
+-----------------
+
+This consumer is based on [Kafka High Level Consumer](https://cwiki.apache.org/confluence/display/KAFKA/Consumer+Group+Example).  This consumer creates `N` threads per topic where `N` = `streams`.  Each thread will block on the iterator until a message becomes available.  Messages are then forwarded to your receiving actor in the same manor.
+
+This actor overrides settings for both:
+```
+consumer.timeout.ms = "-1"
+auto.commit.enable = "true"
+```
+This will not affect the configured values for other actors [AkkaBatchConsumer, AkkaConsumer] and thus you can use both styles of actors in the same project to fit your needs.
+
+
+This consumer is suitable for low volume messages that require minimal latency (eg: Instant Messaging applications)
+
+Some notes on blocking:
+* (http://doc.akka.io/docs/akka/2.2.3/general/actor-systems.html#Blocking_Needs_Careful_Management)[Blocking Needs Careful Management]
+
+`AkkaHighLevelConsumerProps` has similar convenience methods to `AkkaConsumerProps`
+
+So a full example of getting a high level consumer up and running looks like this.
+
+```scala
+import akka.actor.{Props, ActorSystem, Actor}
+import com.sclasen.akka.kafka.{AkkaHighLevelConsumer, AkkaHighLevelConsumerProps}
+import kafka.serializer.DefaultDecoder
+
+object Example {
+  class Printer extends Actor{
+    def receive = {
+      case x:Any =>
+        println(x)
+        sender ! StreamFSM.Processed
+    }
+  }
+
+  val system = ActorSystem("test")
+  val printer = system.actorOf(Props[Printer])
+
+  /*
+  the consumer will have 4 streams (threads that block per topic)
+  */
+  val consumerProps = AkkaHighLevelConsumerProps.forSystem(
+    system = system,
+    zkConnect = "localhost:2181",
+    topic = "your-kafka-topic",
+    group = "your-consumer-group",
+    streams = 4, //one per partition
+    keyDecoder = new DefaultDecoder(),
+    msgDecoder = new DefaultDecoder(),
+    receiver = printer
+  )
+
+  val consumer = new AkkaConsumer(consumerProps)
+
+  consumer.start()  //returns a Future[Unit] that completes when the connector is started
+
+  consumer.stop()   //returns a Future[Unit] that completes when the connector is stopped.
+
+}
+```
+
 develop
 =======
 
