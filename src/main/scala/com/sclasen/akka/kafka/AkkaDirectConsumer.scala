@@ -15,7 +15,7 @@ class AkkaDirectConsumer[Key,Msg](props:AkkaDirectConsumerProps[Key,Msg]) {
   import AkkaConsumer._
 
   lazy val connector = createConnection(props)
-  lazy implicit val ecForBlockingIterator = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(props.streams))
+  lazy val exec = Executors.newFixedThreadPool(props.streams)
 
   def kafkaConsumerProps(zkConnect:String, groupId:String) = {
     val consumerConfig = props.system.settings.config.getConfig("kafka.consumer")
@@ -50,9 +50,12 @@ class AkkaDirectConsumer[Key,Msg](props:AkkaDirectConsumerProps[Key,Msg]) {
     }
   }
 
-  def start():Future[Unit] = {
+  def start():Future[Unit] = Future{
     val streams = createStream
     val f = streams.map { stream =>
+      exec.submit(new Runnable(){
+        def run() {
+      
       val it = stream.iterator()
       def hasNext = try {
         it.hasNext()
@@ -61,15 +64,16 @@ class AkkaDirectConsumer[Key,Msg](props:AkkaDirectConsumerProps[Key,Msg]) {
           props.system.log.warning("AkkaHighLevelConsumer should not see ConsumerTimeoutException")
           false
       }
-      Future {
+      
         props.system.log.debug("blocking on stream")
         while (hasNext) {
           val msg = props.msgHandler(it.next())
           props.receiver ! msg
         }
-      }(ecForBlockingIterator) // or mark the execution context implicit. I like to mention it explicitly.
+      }
+      }
+      })
     }
-    Future.sequence(f).map{_ => Unit}
   }
 
   def stop():Future[Unit] = {
