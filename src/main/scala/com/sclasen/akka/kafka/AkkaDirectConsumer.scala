@@ -1,21 +1,23 @@
 package com.sclasen.akka.kafka
 
-import java.util.concurrent.{TimeUnit, Executors}
+import java.util.concurrent.{Executors, TimeUnit}
+
 import akka.actor._
 import akka.util.Timeout
-import collection.JavaConverters._
-import scala.concurrent.{ExecutionContext, Future}
-import concurrent.duration._
 import kafka.consumer._
-import kafka.serializer.Decoder
 import kafka.message.MessageAndMetadata
+import kafka.serializer.Decoder
+
+import scala.collection.JavaConverters._
+import scala.concurrent.Future
+import scala.concurrent.duration._
 
 class AkkaDirectConsumer[Key,Msg](props:AkkaDirectConsumerProps[Key,Msg]) {
 
   import AkkaConsumer._
 
   lazy val connector = createConnection(props)
-  lazy implicit val ecForBlockingIterator = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(props.streams))
+  lazy val executor = Executors.newFixedThreadPool(props.streams)
 
   def kafkaConsumerProps(zkConnect:String, groupId:String) = {
     val consumerConfig = props.system.settings.config.getConfig("kafka.consumer")
@@ -50,33 +52,36 @@ class AkkaDirectConsumer[Key,Msg](props:AkkaDirectConsumerProps[Key,Msg]) {
     }
   }
 
-  def start():Future[Unit] = {
+  def start(): Future[Unit] = Future {
     val streams = createStream
-    val f = streams.map { stream =>
-      val it = stream.iterator()
-      def hasNext = try {
-        it.hasNext()
-      } catch {
-        case cte: ConsumerTimeoutException =>
-          props.system.log.warning("AkkaHighLevelConsumer should not see ConsumerTimeoutException")
-          false
-      }
-      Future {
-        props.system.log.debug("blocking on stream")
-        while (hasNext) {
-          val msg = props.msgHandler(it.next())
-          props.receiver ! msg
+    streams.foreach { stream =>
+      executor.submit(new Runnable() {
+        def run(): Unit = {
+          val it = stream.iterator()
+          def hasNext = try {
+            it.hasNext()
+          } catch {
+            case cte: ConsumerTimeoutException =>
+              props.system.log.warning("AkkaHighLevelConsumer should not see ConsumerTimeoutException")
+              false
+          }
+          props.system.log.debug("blocking on stream")
+          while (hasNext) {
+            val msg = props.msgHandler(it.next())
+            props.receiver ! msg
+          }
         }
-      }(ecForBlockingIterator) // or mark the execution context implicit. I like to mention it explicitly.
+      })
+
     }
-    Future.sequence(f).map{_ => Unit}
+    ()
   }
 
   def stop():Future[Unit] = {
     connector.shutdown()
-    ecForBlockingIterator.shutdown()
+    executor.shutdown()
     try {
-      if (!ecForBlockingIterator.awaitTermination(5000, TimeUnit.MILLISECONDS)) {
+      if (!executor.awaitTermination(5000, TimeUnit.MILLISECONDS)) {
         props.system.log.warning("Timed out waiting for consumer threads to shut down, exiting uncleanly");
       }
     } catch {
