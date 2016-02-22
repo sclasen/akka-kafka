@@ -78,7 +78,7 @@ class AkkaDirectConsumer[Key,Msg](props:AkkaDirectConsumerProps[Key,Msg]) {
     ()
   }
 
-  def stop():Future[Unit] = {
+  def stop():Future[Unit] = Future{
     connector.shutdown()
     executor.shutdown()
     try {
@@ -89,7 +89,7 @@ class AkkaDirectConsumer[Key,Msg](props:AkkaDirectConsumerProps[Key,Msg]) {
       case e:InterruptedException =>
         props.system.log.warning("Interrupted during shutdown, exiting uncleanly");
     }
-    Future.successful(Unit)
+    ()
   }
 }
 
