@@ -32,7 +32,7 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
 
   "AkkaConsumer" should {
     "work with a topic" in {
-      val receiver = system.actorOf(Props(new TestBatchReciever(testActor)))
+      val receiver = system.actorOf(Props(new TestBatchReceiver(testActor)))
       val consumer = new AkkaBatchConsumer(testProps(system, singleTopic, receiver))
       doTest(singleTopic, consumer)
       consumer.stop() pipeTo testActor
@@ -47,7 +47,7 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
     }
     expectMsg(2 seconds, BatchConnectorFSM.Started)
 
-    /*test that we are ok after a recieve timeout*/
+    /*test that we are ok after a receive timeout*/
     expectNoMsg()
 
     (1 to 10).foreach {
@@ -132,7 +132,7 @@ object AkkaBatchConsumerSpec {
 
 }
 
-class TestBatchReciever(testActor: ActorRef) extends Actor {
+class TestBatchReceiver(testActor: ActorRef) extends Actor {
   override def receive = {
     case s: SpecificallyTypedBatch =>
       sender ! BatchProcessed

@@ -110,7 +110,7 @@ class BatchConnectorFSM[Key, Msg, Out:ClassTag, BatchOut](props: AkkaBatchConsum
       stay() using outstanding + props.streams
     case Event(StateTimeout, outstanding) =>
       debugRec(StateTimeout, 0, outstanding)
-      log.info("at=recieve-timeout outstanding={} batch-size={}", outstanding, batch.size)
+      log.info("at=receive-timeout outstanding={} batch-size={}", outstanding, batch.size)
       goto(WaitingToSendBatch)
   }
 
