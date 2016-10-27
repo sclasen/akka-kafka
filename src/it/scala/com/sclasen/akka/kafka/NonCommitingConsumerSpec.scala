@@ -28,7 +28,7 @@ with WordSpecLike with Matchers with BeforeAndAfterAll {
 
   "AkkaConsumer with Non Committing config" should {
     "work with a topic" in {
-      val receiver = system.actorOf(Props(new TestReciever(testActor)))
+      val receiver = system.actorOf(Props(new TestReceiver(testActor)))
       val consumer = new AkkaConsumer(testProps(system, singleTopic, receiver))
       doTest(singleTopic, consumer)
       consumer.stop() pipeTo testActor

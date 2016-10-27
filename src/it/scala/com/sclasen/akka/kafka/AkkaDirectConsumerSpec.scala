@@ -27,7 +27,7 @@ class AkkaDirectConsumerSpec(_system: ActorSystem) extends TestKit(_system) with
 
   "AkkaDirectConsumer" should {
     "work with a topic" in {
-      val receiver = system.actorOf(Props(new TestReciever(testActor)))
+      val receiver = system.actorOf(Props(new TestReceiver(testActor)))
       val consumer = new AkkaDirectConsumer(testProps(system, singleTopic, receiver))
       doTest(singleTopic, consumer)
       consumer.stop() pipeTo testActor
